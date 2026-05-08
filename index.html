@@ -1067,6 +1067,253 @@
       white-space: nowrap;
     }
 
+
+    .week-board-toggle {
+      display: inline-flex;
+      gap: 6px;
+      background: var(--soft);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px;
+      flex-wrap: wrap;
+    }
+
+    .week-mode-button {
+      border: 0;
+      border-radius: 999px;
+      background: transparent;
+      color: #475569;
+      padding: 7px 12px;
+      font-weight: 900;
+      font-size: 12px;
+    }
+
+    .week-mode-button.active {
+      background: var(--dark);
+      color: white;
+    }
+
+    .week-schedule-wrap {
+      overflow-x: hidden;
+      background: white;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      max-width: 100%;
+    }
+
+    .week-schedule-inner {
+      width: 100%;
+      min-width: 0;
+      --week-hour-height: 54px;
+    }
+
+    .week-schedule-head,
+    .week-all-day-row,
+    .week-schedule-body {
+      display: grid;
+      grid-template-columns: 48px repeat(7, minmax(0, 1fr));
+    }
+
+    .week-schedule-corner,
+    .week-schedule-date,
+    .week-all-day-label,
+    .week-all-day-cell {
+      border-bottom: 1px solid var(--line);
+      border-left: 1px solid var(--line);
+      min-width: 0;
+    }
+
+    .week-schedule-corner,
+    .week-all-day-label {
+      border-left: 0;
+      background: var(--soft);
+    }
+
+    .week-schedule-date {
+      border-top: 0;
+      border-right: 0;
+      background: var(--soft);
+      color: var(--text);
+      padding: 6px 2px;
+      text-align: center;
+      font-weight: 900;
+      line-height: 1.15;
+      min-height: 50px;
+    }
+
+    .week-schedule-date.today {
+      background: var(--today-soft);
+      color: #3730a3;
+      box-shadow: inset 0 0 0 2px var(--today-line);
+    }
+
+    .week-schedule-day-small {
+      display: block;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 800;
+    }
+
+    .week-schedule-count {
+      display: inline-block;
+      margin-top: 3px;
+      border-radius: 999px;
+      border: 1px solid var(--line2);
+      background: white;
+      color: #475569;
+      padding: 1px 5px;
+      font-size: 9px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .week-all-day-label {
+      display: grid;
+      place-items: center;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 900;
+      padding: 4px 2px;
+    }
+
+    .week-all-day-cell {
+      min-height: 28px;
+      padding: 3px 2px;
+      background: #fbfdff;
+    }
+
+    .week-all-day-chip {
+      display: block;
+      border-radius: 7px;
+      padding: 2px 4px;
+      margin-bottom: 2px;
+      font-size: 9px;
+      line-height: 1.2;
+      font-weight: 900;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+
+    .week-schedule-labels {
+      position: relative;
+      height: var(--week-timeline-height);
+      background: white;
+      border-right: 1px solid var(--line);
+    }
+
+    .week-schedule-hour-label {
+      position: absolute;
+      right: 5px;
+      transform: translateY(-50%);
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .week-day-column {
+      position: relative;
+      height: var(--week-timeline-height);
+      min-width: 0;
+      border-left: 1px solid var(--line);
+      background: repeating-linear-gradient(
+        to bottom,
+        #fbfbff 0,
+        #fbfbff calc(var(--week-hour-height) - 1px),
+        var(--line) calc(var(--week-hour-height) - 1px),
+        var(--line) var(--week-hour-height)
+      );
+      cursor: pointer;
+    }
+
+    .week-day-column.today {
+      background: repeating-linear-gradient(
+        to bottom,
+        #f7f8ff 0,
+        #f7f8ff calc(var(--week-hour-height) - 1px),
+        var(--today-line) calc(var(--week-hour-height) - 1px),
+        var(--today-line) var(--week-hour-height)
+      );
+    }
+
+    .week-event-block {
+      position: absolute;
+      left: 4px;
+      right: 4px;
+      border-radius: 9px;
+      padding: 4px 4px;
+      overflow: hidden;
+      cursor: pointer;
+      box-shadow: 0 1px 4px rgba(15, 23, 42, 0.10);
+      color: #111827;
+    }
+
+    .week-event-block.class-item {
+      background: #f8fbff;
+    }
+
+    .week-event-title {
+      font-size: 10px;
+      line-height: 1.2;
+      font-weight: 900;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+    }
+
+    .week-event-meta {
+      margin-top: 2px;
+      font-size: 9px;
+      line-height: 1.15;
+      color: #475569;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+    }
+
+    @media (max-width: 720px) {
+      .week-controls {
+        align-items: stretch;
+      }
+
+      .week-board-toggle {
+        width: 100%;
+      }
+
+      .week-mode-button {
+        flex: 1 1 120px;
+      }
+
+      .week-schedule-head,
+      .week-all-day-row,
+      .week-schedule-body {
+        grid-template-columns: 42px repeat(7, minmax(0, 1fr));
+      }
+
+      .week-schedule-inner {
+        --week-hour-height: 50px;
+      }
+
+      .week-schedule-hour-label {
+        right: 4px;
+        font-size: 10px;
+      }
+
+      .week-event-block {
+        left: 2px;
+        right: 2px;
+        padding: 3px 3px;
+        border-radius: 7px;
+      }
+
+      .week-event-title {
+        font-size: 9px;
+      }
+
+      .week-event-meta {
+        font-size: 8px;
+      }
+    }
+
     .timeline-controls {
       display: flex;
       justify-content: flex-end;
@@ -1894,13 +2141,19 @@
         <div class="view-head">
           <div>
             <h2>週カレンダー</h2>
-            <p class="desc">今日から7日分のTodoを横スクロールで表示します。スマホでは一度に約4日分が見える幅にしています。予定は日別・月カレンダーで確認します。</p>
+            <p class="desc">今日から7日分を表示します。Todo表と予定カレンダーを切り替えられます。</p>
           </div>
           <div class="actions">
             <button class="secondary" id="openFabHint">右下＋で追加、右上⚙で管理</button>
           </div>
         </div>
         <div class="week-controls">
+          <div class="week-board-toggle" aria-label="週表示の切り替え">
+            <button type="button" class="week-mode-button" data-week-board-mode="todo">Todo表</button>
+            <button type="button" class="week-mode-button" data-week-board-mode="calendar">予定カレンダー</button>
+          </div>
+        </div>
+        <div id="weekTodoControls" class="week-controls">
           <label>
             週の並び
             <select id="weekSortMode">
@@ -2575,8 +2828,8 @@
   </div>
 
   <script>
-    const STORAGE_KEY = "todo-calendar-board-v79";
-    const OLD_KEYS = ["todo-calendar-board-v78", "todo-calendar-board-v77", "todo-calendar-board-v76", "todo-calendar-board-v75", "todo-calendar-board-v74", "todo-calendar-board-v73", "todo-calendar-board-v72", "todo-calendar-board-v71", "todo-calendar-board-v70", "todo-calendar-board-v69", "todo-calendar-board-v68", "todo-calendar-board-v67", "todo-calendar-board-v66", "todo-calendar-board-v65", "todo-calendar-board-v64", "todo-calendar-board-v63", "todo-calendar-board-v62", "todo-calendar-board-v61", "todo-calendar-board-v60", "todo-calendar-board-v59", "todo-calendar-board-v58", "todo-calendar-board-v57", "todo-calendar-board-v56", "todo-calendar-board-v55", "todo-calendar-board-v54", "todo-calendar-board-v53", "todo-calendar-board-v52", "todo-calendar-board-v51", "todo-calendar-board-v50", "todo-calendar-board-v49", "todo-calendar-board-v48", "todo-calendar-board-v47", "todo-calendar-board-v46", "todo-calendar-board-v45", "todo-calendar-board-v44", "todo-calendar-board-v43", "todo-calendar-board-v42", "todo-calendar-board-v41", "todo-calendar-board-v40", "todo-calendar-board-v39", "todo-calendar-board-v38", "todo-calendar-board-v37", "todo-calendar-board-v36", "todo-calendar-board-v35", "todo-calendar-board-v34", "todo-calendar-board-v33", "todo-calendar-board-v32", "todo-calendar-board-v31", "todo-calendar-board-v30", "todo-calendar-board-v29", "todo-calendar-board-v28", "todo-calendar-board-v27", "todo-calendar-board-v26", "todo-calendar-board-v25", "todo-calendar-board-v24", "todo-calendar-board-v23", "todo-calendar-board-v22", "todo-calendar-board-v21", "todo-calendar-board-v20", "todo-calendar-board-v19", "todo-calendar-board-v18", "todo-calendar-board-v17", "todo-calendar-board-v16", "todo-calendar-board-v15", "todo-calendar-board-v14", "todo-calendar-board-v13", "todo-calendar-board-v12", "todo-calendar-board-v11", "todo-calendar-board-v10", "todo-calendar-board-v9", "todo-calendar-board-v8", "todo-calendar-board-v7", "todo-calendar-board-v6", "todo-calendar-board-v5", "todo-calendar-board-v4", "todo-calendar-board-v3", "todo-calendar-board-v2", "todo-calendar-board-v1"];
+    const STORAGE_KEY = "todo-calendar-board-v80";
+    const OLD_KEYS = ["todo-calendar-board-v79", "todo-calendar-board-v78", "todo-calendar-board-v77", "todo-calendar-board-v76", "todo-calendar-board-v75", "todo-calendar-board-v74", "todo-calendar-board-v73", "todo-calendar-board-v72", "todo-calendar-board-v71", "todo-calendar-board-v70", "todo-calendar-board-v69", "todo-calendar-board-v68", "todo-calendar-board-v67", "todo-calendar-board-v66", "todo-calendar-board-v65", "todo-calendar-board-v64", "todo-calendar-board-v63", "todo-calendar-board-v62", "todo-calendar-board-v61", "todo-calendar-board-v60", "todo-calendar-board-v59", "todo-calendar-board-v58", "todo-calendar-board-v57", "todo-calendar-board-v56", "todo-calendar-board-v55", "todo-calendar-board-v54", "todo-calendar-board-v53", "todo-calendar-board-v52", "todo-calendar-board-v51", "todo-calendar-board-v50", "todo-calendar-board-v49", "todo-calendar-board-v48", "todo-calendar-board-v47", "todo-calendar-board-v46", "todo-calendar-board-v45", "todo-calendar-board-v44", "todo-calendar-board-v43", "todo-calendar-board-v42", "todo-calendar-board-v41", "todo-calendar-board-v40", "todo-calendar-board-v39", "todo-calendar-board-v38", "todo-calendar-board-v37", "todo-calendar-board-v36", "todo-calendar-board-v35", "todo-calendar-board-v34", "todo-calendar-board-v33", "todo-calendar-board-v32", "todo-calendar-board-v31", "todo-calendar-board-v30", "todo-calendar-board-v29", "todo-calendar-board-v28", "todo-calendar-board-v27", "todo-calendar-board-v26", "todo-calendar-board-v25", "todo-calendar-board-v24", "todo-calendar-board-v23", "todo-calendar-board-v22", "todo-calendar-board-v21", "todo-calendar-board-v20", "todo-calendar-board-v19", "todo-calendar-board-v18", "todo-calendar-board-v17", "todo-calendar-board-v16", "todo-calendar-board-v15", "todo-calendar-board-v14", "todo-calendar-board-v13", "todo-calendar-board-v12", "todo-calendar-board-v11", "todo-calendar-board-v10", "todo-calendar-board-v9", "todo-calendar-board-v8", "todo-calendar-board-v7", "todo-calendar-board-v6", "todo-calendar-board-v5", "todo-calendar-board-v4", "todo-calendar-board-v3", "todo-calendar-board-v2", "todo-calendar-board-v1"];
 
     const initialState = {
       parents: [
@@ -2676,6 +2929,7 @@
         }
       },
       weekSortMode: "manual",
+      weekBoardMode: "todo",
       weekOrderChildIds: [],
       weekOrderParentIds: [],
       categoryColors: {
@@ -2746,6 +3000,8 @@
       addChild: document.getElementById("addChild"),
       categoryList: document.getElementById("categoryList"),
       matrixTable: document.getElementById("matrixTable"),
+      weekBoardModeButtons: document.querySelectorAll("[data-week-board-mode]"),
+      weekTodoControls: document.getElementById("weekTodoControls"),
       weekSortMode: document.getElementById("weekSortMode"),
       resetWeekOrder: document.getElementById("resetWeekOrder"),
       monthTitle: document.getElementById("monthTitle"),
@@ -3592,6 +3848,7 @@
         loaded.dayTimetableOverrides = normalizeDayTimetableOverrides(parsed.dayTimetableOverrides);
         loaded.timetableSettings = normalizeTimetableSettings(parsed.timetableSettings);
         loaded.weekSortMode = ["manual", "parent"].includes(parsed.weekSortMode) ? parsed.weekSortMode : "manual";
+        loaded.weekBoardMode = ["todo", "calendar"].includes(parsed.weekBoardMode) ? parsed.weekBoardMode : "todo";
         loaded.weekOrderChildIds = Array.isArray(parsed.weekOrderChildIds) ? parsed.weekOrderChildIds : [];
         loaded.weekOrderParentIds = Array.isArray(parsed.weekOrderParentIds) ? parsed.weekOrderParentIds : [];
         loaded.todos = loaded.todos.map(todo => {
@@ -3841,6 +4098,172 @@
       ).join("")}</div>`;
     }
 
+    function currentWeekBoardMode() {
+      return state.weekBoardMode === "calendar" ? "calendar" : "todo";
+    }
+
+    function updateWeekBoardControls() {
+      const mode = currentWeekBoardMode();
+      els.weekBoardModeButtons.forEach(button => {
+        const active = button.dataset.weekBoardMode === mode;
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-pressed", active ? "true" : "false");
+      });
+      if (els.weekTodoControls) {
+        els.weekTodoControls.classList.toggle("hidden-field", mode !== "todo");
+      }
+      if (els.matrixTable) {
+        els.matrixTable.className = mode === "todo" ? "table-wrap" : "";
+      }
+    }
+
+    function weekScheduleCount(dateString) {
+      const eventCount = state.todos.filter(todo => (todo.kind || "todo") === "event" && isEventOnDate(todo, dateString)).length;
+      const classCount = state.showClassesInTimeline ? classesForDate(dateString).length : 0;
+      return eventCount + classCount;
+    }
+
+    function weekAllDayEventsHtml(dateString) {
+      const events = state.todos
+        .filter(todo => (todo.kind || "todo") === "event" && isEventOnDate(todo, dateString) && !timelineEventForDate(todo, dateString).startTime)
+        .sort((a, b) => String(a.title || "").localeCompare(String(b.title || "")));
+      if (!events.length) return "";
+      const visible = events.slice(0, 3).map(todo => `
+        <div class="week-all-day-chip" data-action="edit" data-id="${escapeHtml(todo.id)}" style="background:${certaintyColor(todo.certaintyId)}; border:1px solid ${certaintyColor(todo.certaintyId)};">
+          ${escapeHtml(todo.title)}
+        </div>
+      `).join("");
+      const more = events.length > 3 ? `<div class="month-more">ほか${events.length - 3}件</div>` : "";
+      return visible + more;
+    }
+
+    function weekTimelineColumnStyle(column, columns) {
+      const safeColumns = Math.max(1, Number(columns) || 1);
+      if (safeColumns <= 1) return "left:4px; right:4px;";
+      const safeColumn = Math.max(0, Math.min(safeColumns - 1, Number(column) || 0));
+      const inset = 4;
+      const gap = 3;
+      const slotPercent = 100 / safeColumns;
+      const leftPercent = slotPercent * safeColumn;
+      const totalGapPx = inset * 2 + gap * (safeColumns - 1);
+      const leftPx = inset + safeColumn * gap - (totalGapPx * safeColumn / safeColumns);
+      const widthPx = totalGapPx / safeColumns;
+      return `left:calc(${leftPercent.toFixed(5)}%${signedPxForCalc(leftPx)}); right:auto; width:calc(${slotPercent.toFixed(5)}% - ${widthPx.toFixed(2)}px);`;
+    }
+
+    function weekTimedItemsForDate(dateString, startHour, endHour, pxPerHour) {
+      const timelineStartMinutes = startHour * 60;
+      const timelineEndMinutes = endHour * 60;
+      const timedEvents = [
+        ...state.todos
+          .filter(todo => (todo.kind || "todo") === "event" && isEventOnDate(todo, dateString) && timelineEventForDate(todo, dateString).startTime)
+          .map(todo => timelineEventForDate(todo, dateString)),
+        ...(state.showClassesInTimeline ? classesForDate(dateString) : [])
+      ].sort((a, b) => String(a.startTime || "").localeCompare(String(b.startTime || "")));
+
+      const timelineItems = timedEvents.map(todo => {
+        const start = minutesFromTime(todo.startTime);
+        const end = minutesFromTime(todo.endTime) ?? (start === null ? null : start + 60);
+        if (start === null) return null;
+
+        const clippedStart = clamp(start, timelineStartMinutes, timelineEndMinutes);
+        const clippedEnd = clamp(Math.max(end, start + 30), timelineStartMinutes, timelineEndMinutes);
+        if (clippedEnd <= timelineStartMinutes || clippedStart >= timelineEndMinutes) return null;
+
+        const top = ((clippedStart - timelineStartMinutes) / 60) * pxPerHour;
+        const height = Math.max(24, ((clippedEnd - clippedStart) / 60) * pxPerHour);
+        const visualDurationMinutes = Math.max(clippedEnd - clippedStart, (height / pxPerHour) * 60);
+
+        return {
+          todo,
+          top,
+          height,
+          layoutStart: clippedStart,
+          layoutEnd: clippedStart + visualDurationMinutes
+        };
+      }).filter(Boolean);
+
+      return layoutTimelineItems(timelineItems);
+    }
+
+    function weekEventBlockHtml(item, dateString) {
+      const todo = item.todo;
+      const action = todo.kind === "class" ? "open-class-inline" : "edit";
+      const borderStyle = todo.kind === "class"
+        ? "border:2px solid " + classPresetColor(todo.colorKey) + "; background:" + classPresetColor(todo.colorKey)
+        : "border:2px solid " + certaintyColor(todo.certaintyId) + "; background:" + certaintyColor(todo.certaintyId);
+      const columnStyle = weekTimelineColumnStyle(item.layoutColumn, item.layoutColumns);
+      const meta = todo.kind === "class"
+        ? `${todo.startTime}〜${todo.endTime}${todo.room ? "・" + todo.room : ""}`
+        : `${timeText(todo)}${todo.location ? "・" + todo.location : ""}`;
+
+      return `
+        <div
+          class="week-event-block ${todo.kind === "class" ? "class-item" : ""}"
+          data-action="${action}"
+          data-id="${escapeHtml(todo.id)}"
+          style="top:${item.top}px; height:${item.height}px; ${columnStyle} ${borderStyle}"
+        >
+          <div class="week-event-title">${escapeHtml(todo.title)}</div>
+          <div class="week-event-meta">${escapeHtml(meta)}</div>
+        </div>
+      `;
+    }
+
+    function renderWeekSchedule(dates) {
+      const startHour = 5;
+      const endHour = 24;
+      const pxPerHour = window.innerWidth <= 720 ? 50 : 54;
+      const timelineHeight = (endHour - startHour) * pxPerHour;
+
+      const headerHtml = dates.map(date => {
+        const d = toDate(date);
+        const weekday = weekdayFullLabel(date);
+        return `
+          <button class="week-schedule-date ${date === todayString() ? "today" : ""}" data-action="select-day" data-date="${escapeHtml(date)}">
+            <span class="week-schedule-day-small">${escapeHtml(weekday)}</span>
+            ${d.getDate()}
+            <span class="week-schedule-count">${weekScheduleCount(date)}件</span>
+          </button>
+        `;
+      }).join("");
+
+      const allDayHtml = dates.map(date => `<div class="week-all-day-cell">${weekAllDayEventsHtml(date)}</div>`).join("");
+
+      const labels = Array.from({ length: endHour - startHour + 1 }, (_, index) => {
+        const hour = startHour + index;
+        const top = index * pxPerHour;
+        const hourText = String(hour).padStart(2, "0") + ":00";
+        return `<div class="week-schedule-hour-label" style="top:${top}px">${hourText}</div>`;
+      }).join("");
+
+      const columns = dates.map(date => {
+        const blocks = weekTimedItemsForDate(date, startHour, endHour, pxPerHour)
+          .map(item => weekEventBlockHtml(item, date))
+          .join("");
+        return `<div class="week-day-column ${date === todayString() ? "today" : ""}" data-action="select-day" data-date="${escapeHtml(date)}">${blocks}</div>`;
+      }).join("");
+
+      els.matrixTable.innerHTML = `
+        <div class="week-schedule-wrap">
+          <div class="week-schedule-inner" style="--week-timeline-height:${timelineHeight}px; --week-hour-height:${pxPerHour}px;">
+            <div class="week-schedule-head">
+              <div class="week-schedule-corner"></div>
+              ${headerHtml}
+            </div>
+            <div class="week-all-day-row">
+              <div class="week-all-day-label">終日</div>
+              ${allDayHtml}
+            </div>
+            <div class="week-schedule-body">
+              <div class="week-schedule-labels">${labels}</div>
+              ${columns}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
     function fillSelect(select, options, selectedValue) {
       select.innerHTML = options.map(option =>
         `<option value="${escapeHtml(option.value)}"${option.value === selectedValue ? " selected" : ""}>${escapeHtml(option.label)}</option>`
@@ -3960,6 +4383,11 @@
 
     function renderMatrix() {
       const dates = getDateRange(todayString(), 7);
+      updateWeekBoardControls();
+      if (currentWeekBoardMode() === "calendar") {
+        renderWeekSchedule(dates);
+        return;
+      }
       const categories = weekCategories();
       els.weekSortMode.value = state.weekSortMode;
 
@@ -5452,6 +5880,7 @@
       console.assert(isEventOnDate({ kind: "event", date: "2026-05-01", endDate: "2026-05-01", repeatMode: "weekly" }, "2026-05-15"), "weekly event should repeat");
       console.assert(!isEventOnDate({ kind: "event", date: "2026-05-01", endDate: "2026-05-01", repeatMode: "weekly", repeatUntil: "2026-05-08" }, "2026-05-15"), "weekly event should stop after repeat end date");
       console.assert(safeImageSrc("data:image/jpeg;base64,AAAA") !== "", "image data URL should be accepted");
+      console.assert(["todo", "calendar"].includes(currentWeekBoardMode()), "week board mode should be valid");
     }
 
     document.querySelectorAll("[data-view-button]").forEach(button => {
@@ -5563,6 +5992,13 @@
       state.categorySearchQuery = els.categorySearch.value;
       saveState();
       safeRenderPart("カテゴリ別", renderCategory);
+    });
+
+    els.weekBoardModeButtons.forEach(button => {
+      button.addEventListener("click", () => {
+        state.weekBoardMode = button.dataset.weekBoardMode === "calendar" ? "calendar" : "todo";
+        renderAll();
+      });
     });
 
     els.weekSortMode.addEventListener("change", () => {
