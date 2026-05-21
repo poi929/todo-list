@@ -1366,6 +1366,53 @@
       margin-top: 2px;
     }
 
+    .override-makeup-box {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: white;
+      padding: 12px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .override-makeup-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .override-makeup-item {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: start;
+      border: 1px solid var(--line);
+      background: var(--soft);
+      border-radius: 14px;
+      padding: 9px 10px;
+    }
+
+    .override-makeup-title {
+      font-weight: 900;
+      word-break: break-word;
+    }
+
+    .override-makeup-meta {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 2px;
+    }
+
+    .override-makeup-delete {
+      border: 1px solid #fecaca;
+      background: #fff7f7;
+      color: #b91c1c;
+      border-radius: 999px;
+      padding: 4px 8px;
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
     .toggle-chip {
       border: 1px solid var(--line2);
       background: white;
@@ -2803,6 +2850,25 @@
           <div id="dayOverrideClassList" class="override-class-list"></div>
         </div>
 
+        <div class="override-makeup-box">
+          <div>
+            <h3 style="margin:0; font-size:15px;">この日だけ補講を追加</h3>
+            <p class="desc">通常登録している時間割から授業を選び、この日の日別・週予定カレンダーだけに追加します。</p>
+          </div>
+
+          <label>
+            補講にする授業
+            <select id="dayOverrideMakeupClass"></select>
+          </label>
+
+          <button id="addDayOverrideMakeup" class="secondary" type="button">選択した授業を補講として追加</button>
+
+          <div>
+            <p class="desc">この日に追加する補講</p>
+            <div id="dayOverrideMakeupList" class="override-makeup-list"></div>
+          </div>
+        </div>
+
         <div class="actions">
           <button id="saveDayOverride" class="primary">保存</button>
           <button id="resetDayOverride" class="secondary">この日の振替を解除</button>
@@ -2868,8 +2934,8 @@
   </div>
 
   <script>
-    const STORAGE_KEY = "todo-calendar-board-v82";
-    const OLD_KEYS = ["todo-calendar-board-v81", "todo-calendar-board-v80", "todo-calendar-board-v79", "todo-calendar-board-v78", "todo-calendar-board-v77", "todo-calendar-board-v76", "todo-calendar-board-v75", "todo-calendar-board-v74", "todo-calendar-board-v73", "todo-calendar-board-v72", "todo-calendar-board-v71", "todo-calendar-board-v70", "todo-calendar-board-v69", "todo-calendar-board-v68", "todo-calendar-board-v67", "todo-calendar-board-v66", "todo-calendar-board-v65", "todo-calendar-board-v64", "todo-calendar-board-v63", "todo-calendar-board-v62", "todo-calendar-board-v61", "todo-calendar-board-v60", "todo-calendar-board-v59", "todo-calendar-board-v58", "todo-calendar-board-v57", "todo-calendar-board-v56", "todo-calendar-board-v55", "todo-calendar-board-v54", "todo-calendar-board-v53", "todo-calendar-board-v52", "todo-calendar-board-v51", "todo-calendar-board-v50", "todo-calendar-board-v49", "todo-calendar-board-v48", "todo-calendar-board-v47", "todo-calendar-board-v46", "todo-calendar-board-v45", "todo-calendar-board-v44", "todo-calendar-board-v43", "todo-calendar-board-v42", "todo-calendar-board-v41", "todo-calendar-board-v40", "todo-calendar-board-v39", "todo-calendar-board-v38", "todo-calendar-board-v37", "todo-calendar-board-v36", "todo-calendar-board-v35", "todo-calendar-board-v34", "todo-calendar-board-v33", "todo-calendar-board-v32", "todo-calendar-board-v31", "todo-calendar-board-v30", "todo-calendar-board-v29", "todo-calendar-board-v28", "todo-calendar-board-v27", "todo-calendar-board-v26", "todo-calendar-board-v25", "todo-calendar-board-v24", "todo-calendar-board-v23", "todo-calendar-board-v22", "todo-calendar-board-v21", "todo-calendar-board-v20", "todo-calendar-board-v19", "todo-calendar-board-v18", "todo-calendar-board-v17", "todo-calendar-board-v16", "todo-calendar-board-v15", "todo-calendar-board-v14", "todo-calendar-board-v13", "todo-calendar-board-v12", "todo-calendar-board-v11", "todo-calendar-board-v10", "todo-calendar-board-v9", "todo-calendar-board-v8", "todo-calendar-board-v7", "todo-calendar-board-v6", "todo-calendar-board-v5", "todo-calendar-board-v4", "todo-calendar-board-v3", "todo-calendar-board-v2", "todo-calendar-board-v1"];
+    const STORAGE_KEY = "todo-calendar-board-v84";
+    const OLD_KEYS = ["todo-calendar-board-v83", "todo-calendar-board-v82", "todo-calendar-board-v81", "todo-calendar-board-v80", "todo-calendar-board-v79", "todo-calendar-board-v78", "todo-calendar-board-v77", "todo-calendar-board-v76", "todo-calendar-board-v75", "todo-calendar-board-v74", "todo-calendar-board-v73", "todo-calendar-board-v72", "todo-calendar-board-v71", "todo-calendar-board-v70", "todo-calendar-board-v69", "todo-calendar-board-v68", "todo-calendar-board-v67", "todo-calendar-board-v66", "todo-calendar-board-v65", "todo-calendar-board-v64", "todo-calendar-board-v63", "todo-calendar-board-v62", "todo-calendar-board-v61", "todo-calendar-board-v60", "todo-calendar-board-v59", "todo-calendar-board-v58", "todo-calendar-board-v57", "todo-calendar-board-v56", "todo-calendar-board-v55", "todo-calendar-board-v54", "todo-calendar-board-v53", "todo-calendar-board-v52", "todo-calendar-board-v51", "todo-calendar-board-v50", "todo-calendar-board-v49", "todo-calendar-board-v48", "todo-calendar-board-v47", "todo-calendar-board-v46", "todo-calendar-board-v45", "todo-calendar-board-v44", "todo-calendar-board-v43", "todo-calendar-board-v42", "todo-calendar-board-v41", "todo-calendar-board-v40", "todo-calendar-board-v39", "todo-calendar-board-v38", "todo-calendar-board-v37", "todo-calendar-board-v36", "todo-calendar-board-v35", "todo-calendar-board-v34", "todo-calendar-board-v33", "todo-calendar-board-v32", "todo-calendar-board-v31", "todo-calendar-board-v30", "todo-calendar-board-v29", "todo-calendar-board-v28", "todo-calendar-board-v27", "todo-calendar-board-v26", "todo-calendar-board-v25", "todo-calendar-board-v24", "todo-calendar-board-v23", "todo-calendar-board-v22", "todo-calendar-board-v21", "todo-calendar-board-v20", "todo-calendar-board-v19", "todo-calendar-board-v18", "todo-calendar-board-v17", "todo-calendar-board-v16", "todo-calendar-board-v15", "todo-calendar-board-v14", "todo-calendar-board-v13", "todo-calendar-board-v12", "todo-calendar-board-v11", "todo-calendar-board-v10", "todo-calendar-board-v9", "todo-calendar-board-v8", "todo-calendar-board-v7", "todo-calendar-board-v6", "todo-calendar-board-v5", "todo-calendar-board-v4", "todo-calendar-board-v3", "todo-calendar-board-v2", "todo-calendar-board-v1"];
 
     const initialState = {
       parents: [
@@ -2996,6 +3062,7 @@
     let state = loadState();
     let pendingTodoImageData = "";
     let pendingEditImageData = "";
+    let dayOverrideDraftExtraClasses = [];
 
     const els = {
       todoKind: document.getElementById("todoKind"),
@@ -3144,6 +3211,9 @@
       dayOverrideDateLabel: document.getElementById("dayOverrideDateLabel"),
       dayOverrideWeekday: document.getElementById("dayOverrideWeekday"),
       dayOverrideClassList: document.getElementById("dayOverrideClassList"),
+      dayOverrideMakeupClass: document.getElementById("dayOverrideMakeupClass"),
+      addDayOverrideMakeup: document.getElementById("addDayOverrideMakeup"),
+      dayOverrideMakeupList: document.getElementById("dayOverrideMakeupList"),
       saveDayOverride: document.getElementById("saveDayOverride"),
       resetDayOverride: document.getElementById("resetDayOverride"),
       cancelDayOverride: document.getElementById("cancelDayOverride"),
@@ -3350,7 +3420,57 @@
     }
 
     function classRepeatLabel(classItem) {
+      if (classItem.isMakeupClass) return "補講";
       return classItem.repeatMode === "biweekly" ? "隔週" : "毎週";
+    }
+
+    function normalizeDayOverrideExtraClasses(rawExtraClasses) {
+      if (!Array.isArray(rawExtraClasses)) return [];
+      return rawExtraClasses.map(item => {
+        const sourceClassId = String(item?.sourceClassId || "").trim();
+        const title = String(item?.title || "").trim().slice(0, 80);
+        const startTime = /^\d{2}:\d{2}$/.test(String(item?.startTime || "")) ? String(item.startTime) : "";
+        if (!sourceClassId && (!title || !startTime)) return null;
+        const safeStartTime = startTime || "09:00";
+        const endTime = /^\d{2}:\d{2}$/.test(String(item?.endTime || "")) ? String(item.endTime) : fallbackEndTime(safeStartTime);
+        return {
+          id: String(item?.id || makeId("makeup-class")),
+          sourceClassId,
+          title: title || "補講",
+          teacher: String(item?.teacher || "").trim().slice(0, 80),
+          room: String(item?.room || "").trim().slice(0, 80),
+          startTime: safeStartTime,
+          endTime,
+          colorKey: initialState.classColorPresets.some(preset => preset.id === item?.colorKey) ? item.colorKey : "yellow"
+        };
+      }).filter(Boolean);
+    }
+
+    function classSnapshotForMakeup(sourceClass) {
+      if (!sourceClass) return null;
+      const [fallbackStart, fallbackEnd] = defaultPeriodTimes(sourceClass.period);
+      const startTime = sourceClass.startTime || fallbackStart || "09:00";
+      const endTime = sourceClass.endTime || fallbackEnd || fallbackEndTime(startTime);
+      return {
+        sourceClassId: String(sourceClass.id || ""),
+        title: String(sourceClass.title || "授業").trim() || "授業",
+        teacher: String(sourceClass.teacher || "").trim(),
+        room: String(sourceClass.room || "").trim(),
+        startTime,
+        endTime,
+        colorKey: sourceClass.colorKey || "blue"
+      };
+    }
+
+    function resolveMakeupExtraClass(item) {
+      const source = item.sourceClassId ? state.classes.find(classItem => classItem.id === item.sourceClassId) : null;
+      const snapshot = source ? classSnapshotForMakeup(source) : null;
+      return {
+        ...item,
+        ...(snapshot || {}),
+        id: item.id,
+        sourceClassId: item.sourceClassId || snapshot?.sourceClassId || ""
+      };
     }
 
     function getDayTimetableOverride(dateString) {
@@ -3360,7 +3480,8 @@
         weekday: ["1", "2", "3", "4", "5"].includes(String(raw.weekday || "")) ? String(raw.weekday) : "",
         hiddenClassIds: Array.isArray(raw.hiddenClassIds)
           ? [...new Set(raw.hiddenClassIds.map(id => String(id || "")).filter(Boolean))]
-          : []
+          : [],
+        extraClasses: normalizeDayOverrideExtraClasses(raw.extraClasses)
       };
     }
 
@@ -3374,13 +3495,14 @@
       const hiddenClassIds = Array.isArray(override?.hiddenClassIds)
         ? [...new Set(override.hiddenClassIds.map(id => String(id || "")).filter(Boolean))]
         : [];
+      const extraClasses = normalizeDayOverrideExtraClasses(override?.extraClasses);
 
-      if (!weekday && hiddenClassIds.length === 0) {
+      if (!weekday && hiddenClassIds.length === 0 && extraClasses.length === 0) {
         delete state.dayTimetableOverrides[date];
         return;
       }
 
-      state.dayTimetableOverrides[date] = { weekday, hiddenClassIds };
+      state.dayTimetableOverrides[date] = { weekday, hiddenClassIds, extraClasses };
     }
 
     function effectiveTimetableDayForDate(dateString, override = getDayTimetableOverride(dateString)) {
@@ -3398,7 +3520,7 @@
 
     function isDayTimetableOverrideActive(dateString) {
       const override = getDayTimetableOverride(dateString);
-      return Boolean(override.weekday || override.hiddenClassIds.length);
+      return Boolean(override.weekday || override.hiddenClassIds.length || override.extraClasses.length);
     }
 
     function dayTimetableOverrideSummary(dateString) {
@@ -3406,29 +3528,44 @@
       const parts = [];
       if (override.weekday) parts.push(`${weekdayNameFromIndex(Number(override.weekday))}曜時間割`);
       if (override.hiddenClassIds.length) parts.push(`${override.hiddenClassIds.length}件非表示`);
+      if (override.extraClasses.length) parts.push(`${override.extraClasses.length}件補講`);
       return parts.join("・") || "通常どおり";
     }
 
     function classesForDateWithOverride(dateString, override = getDayTimetableOverride(dateString), includeHidden = false) {
       const date = normalizeDateString(dateString);
       const timetableDay = effectiveTimetableDayForDate(date, override);
-      if (!timetableDay) return [];
-
-      const occurrenceDate = override.weekday ? timetableOccurrenceDateForDate(date, timetableDay) : date;
+      const occurrenceDate = override.weekday && timetableDay ? timetableOccurrenceDateForDate(date, timetableDay) : date;
       const hiddenIds = new Set(override.hiddenClassIds || []);
 
-      return state.classes
-        .filter(item => Number(item.day) === timetableDay)
-        .filter(item => classOccursOnDate(item, occurrenceDate))
-        .filter(item => includeHidden || !hiddenIds.has(item.id))
-        .map(item => ({
-          ...item,
-          date,
-          occurrenceDate,
-          kind: "class",
-          startTime: item.startTime || defaultPeriodTimes(item.period)[0],
-          endTime: item.endTime || defaultPeriodTimes(item.period)[1]
-        }))
+      const regularClasses = timetableDay
+        ? state.classes
+            .filter(item => Number(item.day) === timetableDay)
+            .filter(item => classOccursOnDate(item, occurrenceDate))
+            .filter(item => includeHidden || !hiddenIds.has(item.id))
+            .map(item => ({
+              ...item,
+              date,
+              occurrenceDate,
+              kind: "class",
+              startTime: item.startTime || defaultPeriodTimes(item.period)[0],
+              endTime: item.endTime || defaultPeriodTimes(item.period)[1]
+            }))
+        : [];
+
+      const extraClasses = normalizeDayOverrideExtraClasses(override.extraClasses).map(item => ({
+        ...resolveMakeupExtraClass(item),
+        date,
+        occurrenceDate: date,
+        kind: "class",
+        isMakeupClass: true,
+        day: weekdayIndex(date),
+        period: "補講",
+        startDate: date,
+        repeatMode: "makeup"
+      }));
+
+      return [...regularClasses, ...extraClasses]
         .sort((a, b) => String(a.startTime || "").localeCompare(String(b.startTime || "")));
     }
 
@@ -3617,6 +3754,20 @@
     function minutesFromTime(value) {
       if (!/^\d{2}:\d{2}$/.test(String(value))) return null;
       return Number(value.slice(0, 2)) * 60 + Number(value.slice(3, 5));
+    }
+
+    function timeFromMinutes(totalMinutes) {
+      const safe = Math.max(0, Math.min(24 * 60, Number(totalMinutes) || 0));
+      const hour = Math.floor(safe / 60);
+      const minute = safe % 60;
+      if (hour >= 24) return "23:59";
+      return String(hour).padStart(2, "0") + ":" + String(minute).padStart(2, "0");
+    }
+
+    function fallbackEndTime(startTime) {
+      const start = minutesFromTime(startTime);
+      if (start === null) return "14:30";
+      return timeFromMinutes(Math.min(start + 90, 23 * 60 + 59));
     }
 
     function clamp(value, min, max) {
@@ -3852,8 +4003,9 @@
         const hiddenClassIds = Array.isArray(value.hiddenClassIds)
           ? [...new Set(value.hiddenClassIds.map(id => String(id || "")).filter(Boolean))]
           : [];
-        if (weekday || hiddenClassIds.length) {
-          normalized[dateKey] = { weekday, hiddenClassIds };
+        const extraClasses = normalizeDayOverrideExtraClasses(value.extraClasses);
+        if (weekday || hiddenClassIds.length || extraClasses.length) {
+          normalized[dateKey] = { weekday, hiddenClassIds, extraClasses };
         }
       });
 
@@ -4271,13 +4423,13 @@
 
     function weekEventBlockHtml(item, dateString) {
       const todo = item.todo;
-      const action = todo.kind === "class" ? "open-class-inline" : "edit";
+      const action = todo.isMakeupClass ? "open-day-override" : (todo.kind === "class" ? "open-class-inline" : "edit");
       const borderStyle = todo.kind === "class"
         ? "border:2px solid " + classPresetColor(todo.colorKey) + "; background:" + classPresetColor(todo.colorKey)
         : "border:2px solid " + certaintyColor(todo.certaintyId) + "; background:" + certaintyColor(todo.certaintyId);
       const columnStyle = weekTimelineColumnStyle(item.layoutColumn, item.layoutColumns);
       const meta = todo.kind === "class"
-        ? `${todo.startTime}〜${todo.endTime}${todo.room ? "・" + todo.room : ""}`
+        ? `${todo.startTime}〜${todo.endTime}${todo.room ? "・" + todo.room : ""}${todo.isMakeupClass ? "・補講" : ""}`
         : `${timeText(todo)}${todo.location ? "・" + todo.location : ""}`;
 
       return `
@@ -4285,6 +4437,7 @@
           class="week-event-block ${todo.kind === "class" ? "class-item" : ""}"
           data-action="${action}"
           data-id="${escapeHtml(todo.id)}"
+          data-date="${escapeHtml(dateString)}"
           style="top:${item.top}px; height:${item.height}px; ${columnStyle} ${borderStyle}"
         >
           <div class="week-event-title">${escapeHtml(todo.title)}</div>
@@ -4705,7 +4858,7 @@
 
       const eventBlocks = layoutTimelineItems(timelineItems).map(item => {
         const todo = item.todo;
-        const action = todo.kind === "class" ? "open-class-inline" : "edit";
+        const action = todo.isMakeupClass ? "open-day-override" : (todo.kind === "class" ? "open-class-inline" : "edit");
         const borderStyle = todo.kind === "class"
           ? "border:2px solid " + classPresetColor(todo.colorKey)
           : "border:2px solid " + certaintyColor(todo.certaintyId) + "; background:" + certaintyColor(todo.certaintyId);
@@ -4719,6 +4872,7 @@
             class="timeline-event-block ${todo.kind === "class" ? "class-item" : ""}"
             data-action="${action}"
             data-id="${escapeHtml(todo.id)}"
+            data-date="${escapeHtml(state.selectedDate)}"
             style="top:${item.top}px; height:${item.height}px; ${columnStyle} ${borderStyle}"
           >
             <div class="timeline-event-title">${escapeHtml(todo.title)}</div>
@@ -4757,6 +4911,74 @@
       ].join("");
     }
 
+    function timetableClassOptionLabel(classItem) {
+      const [fallbackStart, fallbackEnd] = defaultPeriodTimes(classItem.period);
+      const startTime = classItem.startTime || fallbackStart || "--:--";
+      const endTime = classItem.endTime || fallbackEnd || "--:--";
+      const title = classItem.title || "授業";
+      return `${weekdayNameFromIndex(Number(classItem.day))}曜${classItem.period}限 ${title}（${startTime}〜${endTime}${classItem.room ? "・" + classItem.room : ""}）`;
+    }
+
+    function renderDayOverrideMakeupClassSelect() {
+      if (!els.dayOverrideMakeupClass) return;
+      const classItems = [...state.classes].sort((a, b) => {
+        const dayDiff = Number(a.day || 0) - Number(b.day || 0);
+        if (dayDiff) return dayDiff;
+        const periodDiff = Number(a.period || 0) - Number(b.period || 0);
+        if (periodDiff) return periodDiff;
+        return String(a.title || "").localeCompare(String(b.title || ""), "ja");
+      });
+      if (!classItems.length) {
+        els.dayOverrideMakeupClass.innerHTML = `<option value="">時間割に登録済みの授業がありません</option>`;
+        els.dayOverrideMakeupClass.disabled = true;
+        els.addDayOverrideMakeup.disabled = true;
+        return;
+      }
+      els.dayOverrideMakeupClass.disabled = false;
+      els.addDayOverrideMakeup.disabled = false;
+      els.dayOverrideMakeupClass.innerHTML = classItems.map(item =>
+        `<option value="${escapeHtml(item.id)}">${escapeHtml(timetableClassOptionLabel(item))}</option>`
+      ).join("");
+    }
+
+    function renderDayOverrideMakeupList() {
+      if (!els.dayOverrideMakeupList) return;
+      const extras = normalizeDayOverrideExtraClasses(dayOverrideDraftExtraClasses);
+      dayOverrideDraftExtraClasses = extras;
+      if (!extras.length) {
+        els.dayOverrideMakeupList.innerHTML = `<div class="empty" style="padding:14px 10px;">追加する補講はありません。</div>`;
+        return;
+      }
+      els.dayOverrideMakeupList.innerHTML = extras.map(item => {
+        const resolved = resolveMakeupExtraClass(item);
+        const sourceLabel = resolved.sourceClassId ? "通常時間割から追加" : "手入力データ";
+        return `
+          <div class="override-makeup-item">
+            <div>
+              <div class="override-makeup-title">${escapeHtml(resolved.title)}</div>
+              <div class="override-makeup-meta">${escapeHtml(resolved.startTime)}〜${escapeHtml(resolved.endTime)}${resolved.room ? "・" + escapeHtml(resolved.room) : ""}${resolved.teacher ? "・" + escapeHtml(resolved.teacher) : ""}・${escapeHtml(sourceLabel)}</div>
+            </div>
+            <button class="override-makeup-delete" type="button" data-makeup-delete="${escapeHtml(resolved.id)}">削除</button>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function addDayOverrideMakeup() {
+      const classId = els.dayOverrideMakeupClass.value;
+      const sourceClass = state.classes.find(item => item.id === classId);
+      const snapshot = classSnapshotForMakeup(sourceClass);
+      if (!snapshot) {
+        alert("補講にする授業を選択してください。");
+        return;
+      }
+      dayOverrideDraftExtraClasses.push({
+        id: makeId("makeup-class"),
+        ...snapshot
+      });
+      renderDayOverrideMakeupList();
+    }
+
     function renderDayOverrideClassList() {
       const current = getDayTimetableOverride(state.selectedDate);
       const draftOverride = {
@@ -4764,7 +4986,8 @@
         hiddenClassIds: current.hiddenClassIds
       };
       const hiddenIds = new Set(current.hiddenClassIds);
-      const classItems = classesForDateWithOverride(state.selectedDate, draftOverride, true);
+      const classItems = classesForDateWithOverride(state.selectedDate, draftOverride, true)
+        .filter(item => !item.isMakeupClass);
 
       if (!classItems.length) {
         els.dayOverrideClassList.innerHTML = `<div class="empty" style="padding:18px 12px;">この日に表示対象となる授業はありません。</div>`;
@@ -4787,7 +5010,10 @@
       const override = getDayTimetableOverride(state.selectedDate);
       els.dayOverrideDateLabel.textContent = `${dateLabel(state.selectedDate)} の日別時間割だけに適用します。`;
       els.dayOverrideWeekday.value = override.weekday || "";
+      dayOverrideDraftExtraClasses = clone(override.extraClasses || []);
+      renderDayOverrideMakeupClassSelect();
       renderDayOverrideClassList();
+      renderDayOverrideMakeupList();
       els.dayOverrideModal.classList.add("show");
       els.dayOverrideModal.setAttribute("aria-hidden", "false");
     }
@@ -4803,7 +5029,8 @@
         .filter(Boolean);
       saveDayTimetableOverride(state.selectedDate, {
         weekday: els.dayOverrideWeekday.value || "",
-        hiddenClassIds
+        hiddenClassIds,
+        extraClasses: dayOverrideDraftExtraClasses
       });
       saveState();
       closeDayOverrideModal();
@@ -4811,7 +5038,7 @@
     }
 
     function resetDayOverride() {
-      saveDayTimetableOverride(state.selectedDate, { weekday: "", hiddenClassIds: [] });
+      saveDayTimetableOverride(state.selectedDate, { weekday: "", hiddenClassIds: [], extraClasses: [] });
       saveState();
       closeDayOverrideModal();
       renderAll();
@@ -5925,6 +6152,11 @@
         deleteChildCategory(parentId, childId);
       }
       if (action === "open-day-override") {
+        if (date && date !== state.selectedDate) {
+          state.selectedDate = date;
+          state.view = "day";
+          renderAll();
+        }
         openDayOverrideModal();
       }
       if (action === "toggle-class-timeline") {
@@ -5957,6 +6189,7 @@
       console.assert(classOccursOnDate({ day: 1, startDate: "2026-05-04", repeatMode: "biweekly" }, "2026-05-18"), "biweekly class should appear two weeks after start date");
       console.assert(!classOccursOnDate({ day: 1, startDate: "2026-05-04", repeatMode: "biweekly" }, "2026-05-11"), "biweekly class should not appear one week after start date");
       console.assert(timetableOccurrenceDateForDate("2026-05-07", 1) === "2026-05-04", "Thursday override to Monday should use Monday in the same week");
+      console.assert(normalizeDayOverrideExtraClasses([{ title: "補講", startTime: "10:00" }]).length === 1, "legacy makeup class should normalize");
       console.assert(isEventOnDate({ kind: "event", date: "2026-05-01", endDate: "2026-05-01", repeatMode: "weekly" }, "2026-05-15"), "weekly event should repeat");
       console.assert(!isEventOnDate({ kind: "event", date: "2026-05-01", endDate: "2026-05-01", repeatMode: "weekly", repeatUntil: "2026-05-08" }, "2026-05-15"), "weekly event should stop after repeat end date");
       console.assert(monthSpanInfoForEntry({ todo: { kind: "event", id: "x", date: "2026-05-01", endDate: "2026-05-03" }, isCarryOver: false }, "2026-05-02").className.includes("middle"), "middle day of multi-day month event should be a connected middle segment");
@@ -6199,6 +6432,14 @@
     els.saveDayOverride.addEventListener("click", saveDayOverride);
     els.resetDayOverride.addEventListener("click", resetDayOverride);
     els.dayOverrideWeekday.addEventListener("change", renderDayOverrideClassList);
+    els.addDayOverrideMakeup.addEventListener("click", addDayOverrideMakeup);
+    els.dayOverrideMakeupList.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-makeup-delete]");
+      if (!button) return;
+      const id = button.dataset.makeupDelete;
+      dayOverrideDraftExtraClasses = dayOverrideDraftExtraClasses.filter(item => item.id !== id);
+      renderDayOverrideMakeupList();
+    });
     els.dayOverrideModal.addEventListener("click", (event) => {
       if (event.target === els.dayOverrideModal) closeDayOverrideModal();
     });
