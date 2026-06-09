@@ -1321,6 +1321,49 @@
       }
     }
 
+    .week-schedule-nav {
+      display: flex;
+      align-items: end;
+      gap: 8px;
+      flex-wrap: wrap;
+      width: 100%;
+    }
+
+    .week-schedule-range {
+      min-width: 150px;
+      padding: 8px 4px;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 900;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    .week-schedule-jump {
+      min-width: 145px;
+      flex: 1 1 145px;
+    }
+
+    @media (max-width: 720px) {
+      .week-schedule-nav {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        align-items: center;
+      }
+
+      .week-schedule-range {
+        min-width: 0;
+        padding-left: 0;
+        padding-right: 0;
+        font-size: 12px;
+      }
+
+      .week-schedule-jump,
+      #thisWeekSchedule {
+        grid-column: 1 / -1;
+      }
+    }
+
     .timeline-controls {
       display: flex;
       justify-content: flex-end;
@@ -2341,6 +2384,18 @@
             <button type="button" class="week-mode-button" data-week-board-mode="calendar">予定カレンダー</button>
           </div>
         </div>
+        <div id="weekScheduleControls" class="week-controls hidden-field">
+          <div class="week-schedule-nav" aria-label="週予定カレンダーの期間移動">
+            <button id="prevWeekSchedule" type="button" class="secondary">前の7日</button>
+            <div id="weekScheduleRange" class="week-schedule-range"></div>
+            <button id="nextWeekSchedule" type="button" class="secondary">次の7日</button>
+            <button id="thisWeekSchedule" type="button" class="secondary">今日から</button>
+            <label class="week-schedule-jump">
+              開始日を指定
+              <input id="weekScheduleStartDate" type="date" />
+            </label>
+          </div>
+        </div>
         <div id="weekTodoControls" class="week-controls">
           <label>
             週の並び
@@ -3123,8 +3178,8 @@
   </div>
 
   <script>
-    const STORAGE_KEY = "todo-calendar-board-v87";
-    const OLD_KEYS = ["todo-calendar-board-v86", "todo-calendar-board-v85", "todo-calendar-board-v84", "todo-calendar-board-v83", "todo-calendar-board-v82", "todo-calendar-board-v81", "todo-calendar-board-v80", "todo-calendar-board-v79", "todo-calendar-board-v78", "todo-calendar-board-v77", "todo-calendar-board-v76", "todo-calendar-board-v75", "todo-calendar-board-v74", "todo-calendar-board-v73", "todo-calendar-board-v72", "todo-calendar-board-v71", "todo-calendar-board-v70", "todo-calendar-board-v69", "todo-calendar-board-v68", "todo-calendar-board-v67", "todo-calendar-board-v66", "todo-calendar-board-v65", "todo-calendar-board-v64", "todo-calendar-board-v63", "todo-calendar-board-v62", "todo-calendar-board-v61", "todo-calendar-board-v60", "todo-calendar-board-v59", "todo-calendar-board-v58", "todo-calendar-board-v57", "todo-calendar-board-v56", "todo-calendar-board-v55", "todo-calendar-board-v54", "todo-calendar-board-v53", "todo-calendar-board-v52", "todo-calendar-board-v51", "todo-calendar-board-v50", "todo-calendar-board-v49", "todo-calendar-board-v48", "todo-calendar-board-v47", "todo-calendar-board-v46", "todo-calendar-board-v45", "todo-calendar-board-v44", "todo-calendar-board-v43", "todo-calendar-board-v42", "todo-calendar-board-v41", "todo-calendar-board-v40", "todo-calendar-board-v39", "todo-calendar-board-v38", "todo-calendar-board-v37", "todo-calendar-board-v36", "todo-calendar-board-v35", "todo-calendar-board-v34", "todo-calendar-board-v33", "todo-calendar-board-v32", "todo-calendar-board-v31", "todo-calendar-board-v30", "todo-calendar-board-v29", "todo-calendar-board-v28", "todo-calendar-board-v27", "todo-calendar-board-v26", "todo-calendar-board-v25", "todo-calendar-board-v24", "todo-calendar-board-v23", "todo-calendar-board-v22", "todo-calendar-board-v21", "todo-calendar-board-v20", "todo-calendar-board-v19", "todo-calendar-board-v18", "todo-calendar-board-v17", "todo-calendar-board-v16", "todo-calendar-board-v15", "todo-calendar-board-v14", "todo-calendar-board-v13", "todo-calendar-board-v12", "todo-calendar-board-v11", "todo-calendar-board-v10", "todo-calendar-board-v9", "todo-calendar-board-v8", "todo-calendar-board-v7", "todo-calendar-board-v6", "todo-calendar-board-v5", "todo-calendar-board-v4", "todo-calendar-board-v3", "todo-calendar-board-v2", "todo-calendar-board-v1"];
+    const STORAGE_KEY = "todo-calendar-board-v88";
+    const OLD_KEYS = ["todo-calendar-board-v87", "todo-calendar-board-v86", "todo-calendar-board-v85", "todo-calendar-board-v84", "todo-calendar-board-v83", "todo-calendar-board-v82", "todo-calendar-board-v81", "todo-calendar-board-v80", "todo-calendar-board-v79", "todo-calendar-board-v78", "todo-calendar-board-v77", "todo-calendar-board-v76", "todo-calendar-board-v75", "todo-calendar-board-v74", "todo-calendar-board-v73", "todo-calendar-board-v72", "todo-calendar-board-v71", "todo-calendar-board-v70", "todo-calendar-board-v69", "todo-calendar-board-v68", "todo-calendar-board-v67", "todo-calendar-board-v66", "todo-calendar-board-v65", "todo-calendar-board-v64", "todo-calendar-board-v63", "todo-calendar-board-v62", "todo-calendar-board-v61", "todo-calendar-board-v60", "todo-calendar-board-v59", "todo-calendar-board-v58", "todo-calendar-board-v57", "todo-calendar-board-v56", "todo-calendar-board-v55", "todo-calendar-board-v54", "todo-calendar-board-v53", "todo-calendar-board-v52", "todo-calendar-board-v51", "todo-calendar-board-v50", "todo-calendar-board-v49", "todo-calendar-board-v48", "todo-calendar-board-v47", "todo-calendar-board-v46", "todo-calendar-board-v45", "todo-calendar-board-v44", "todo-calendar-board-v43", "todo-calendar-board-v42", "todo-calendar-board-v41", "todo-calendar-board-v40", "todo-calendar-board-v39", "todo-calendar-board-v38", "todo-calendar-board-v37", "todo-calendar-board-v36", "todo-calendar-board-v35", "todo-calendar-board-v34", "todo-calendar-board-v33", "todo-calendar-board-v32", "todo-calendar-board-v31", "todo-calendar-board-v30", "todo-calendar-board-v29", "todo-calendar-board-v28", "todo-calendar-board-v27", "todo-calendar-board-v26", "todo-calendar-board-v25", "todo-calendar-board-v24", "todo-calendar-board-v23", "todo-calendar-board-v22", "todo-calendar-board-v21", "todo-calendar-board-v20", "todo-calendar-board-v19", "todo-calendar-board-v18", "todo-calendar-board-v17", "todo-calendar-board-v16", "todo-calendar-board-v15", "todo-calendar-board-v14", "todo-calendar-board-v13", "todo-calendar-board-v12", "todo-calendar-board-v11", "todo-calendar-board-v10", "todo-calendar-board-v9", "todo-calendar-board-v8", "todo-calendar-board-v7", "todo-calendar-board-v6", "todo-calendar-board-v5", "todo-calendar-board-v4", "todo-calendar-board-v3", "todo-calendar-board-v2", "todo-calendar-board-v1"];
 
     const initialState = {
       parents: [
@@ -3225,6 +3280,7 @@
       },
       weekSortMode: "manual",
       weekBoardMode: "todo",
+      weekScheduleCursor: todayString(),
       weekOrderChildIds: [],
       weekOrderParentIds: [],
       categoryColors: {
@@ -3297,6 +3353,12 @@
       categoryList: document.getElementById("categoryList"),
       matrixTable: document.getElementById("matrixTable"),
       weekBoardModeButtons: document.querySelectorAll("[data-week-board-mode]"),
+      weekScheduleControls: document.getElementById("weekScheduleControls"),
+      prevWeekSchedule: document.getElementById("prevWeekSchedule"),
+      nextWeekSchedule: document.getElementById("nextWeekSchedule"),
+      thisWeekSchedule: document.getElementById("thisWeekSchedule"),
+      weekScheduleRange: document.getElementById("weekScheduleRange"),
+      weekScheduleStartDate: document.getElementById("weekScheduleStartDate"),
       weekTodoControls: document.getElementById("weekTodoControls"),
       weekSortMode: document.getElementById("weekSortMode"),
       resetWeekOrder: document.getElementById("resetWeekOrder"),
@@ -4267,6 +4329,7 @@
         loaded.timetableSettings = normalizeTimetableSettings(parsed.timetableSettings);
         loaded.weekSortMode = ["manual", "parent"].includes(parsed.weekSortMode) ? parsed.weekSortMode : "manual";
         loaded.weekBoardMode = ["todo", "calendar"].includes(parsed.weekBoardMode) ? parsed.weekBoardMode : "todo";
+        loaded.weekScheduleCursor = normalizeDateString(parsed.weekScheduleCursor, todayString());
         loaded.weekOrderChildIds = Array.isArray(parsed.weekOrderChildIds) ? parsed.weekOrderChildIds : [];
         loaded.weekOrderParentIds = Array.isArray(parsed.weekOrderParentIds) ? parsed.weekOrderParentIds : [];
         loaded.todos = loaded.todos.map(todo => {
@@ -4563,6 +4626,16 @@
       return state.weekBoardMode === "calendar" ? "calendar" : "todo";
     }
 
+    function currentWeekScheduleStart() {
+      return normalizeDateString(state.weekScheduleCursor, todayString());
+    }
+
+    function weekScheduleRangeText(startDate) {
+      const start = normalizeDateString(startDate, todayString());
+      const end = dateOffset(start, 6);
+      return dateLabel(start) + "〜" + dateLabel(end);
+    }
+
     function updateWeekBoardControls() {
       const mode = currentWeekBoardMode();
       els.weekBoardModeButtons.forEach(button => {
@@ -4572,6 +4645,15 @@
       });
       if (els.weekTodoControls) {
         els.weekTodoControls.classList.toggle("hidden-field", mode !== "todo");
+      }
+      if (els.weekScheduleControls) {
+        els.weekScheduleControls.classList.toggle("hidden-field", mode !== "calendar");
+      }
+      if (els.weekScheduleStartDate) {
+        els.weekScheduleStartDate.value = currentWeekScheduleStart();
+      }
+      if (els.weekScheduleRange) {
+        els.weekScheduleRange.textContent = weekScheduleRangeText(currentWeekScheduleStart());
       }
       if (els.matrixTable) {
         els.matrixTable.className = mode === "todo" ? "table-wrap" : "";
@@ -4844,9 +4926,11 @@
     }
 
     function renderMatrix() {
-      const dates = getDateRange(todayString(), 7);
+      const mode = currentWeekBoardMode();
+      const startDate = mode === "calendar" ? currentWeekScheduleStart() : todayString();
+      const dates = getDateRange(startDate, 7);
       updateWeekBoardControls();
-      if (currentWeekBoardMode() === "calendar") {
+      if (mode === "calendar") {
         renderWeekSchedule(dates);
         return;
       }
@@ -6091,6 +6175,9 @@
         if (firstDateOfMonth(state.monthCursor) === firstDateOfMonth(state.lastKnownToday)) {
           state.monthCursor = currentToday;
         }
+        if (state.weekScheduleCursor === state.lastKnownToday) {
+          state.weekScheduleCursor = currentToday;
+        }
         state.lastKnownToday = currentToday;
       }
     }
@@ -6764,6 +6851,26 @@
         state.weekBoardMode = button.dataset.weekBoardMode === "calendar" ? "calendar" : "todo";
         renderAll();
       });
+    });
+
+    els.prevWeekSchedule.addEventListener("click", () => {
+      state.weekScheduleCursor = dateOffset(currentWeekScheduleStart(), -7);
+      renderAll();
+    });
+
+    els.nextWeekSchedule.addEventListener("click", () => {
+      state.weekScheduleCursor = dateOffset(currentWeekScheduleStart(), 7);
+      renderAll();
+    });
+
+    els.thisWeekSchedule.addEventListener("click", () => {
+      state.weekScheduleCursor = todayString();
+      renderAll();
+    });
+
+    els.weekScheduleStartDate.addEventListener("change", () => {
+      state.weekScheduleCursor = normalizeDateString(els.weekScheduleStartDate.value, todayString());
+      renderAll();
     });
 
     els.weekSortMode.addEventListener("change", () => {
