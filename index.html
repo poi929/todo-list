@@ -2775,6 +2775,21 @@
           <p class="desc">重要度の枠線色や予定の確定度ラベルを変更できます。初期色は目に優しい低彩度カラーにしています。</p>
 
           <details class="settings-box" open>
+            <summary>日別・週予定カレンダーの表示時間</summary>
+            <p class="desc">日別画面と週の予定カレンダーに表示する時間帯を変更できます。</p>
+            <div class="two" style="margin-top:10px;">
+              <label>
+                開始時刻
+                <select id="timelineStartHour"></select>
+              </label>
+              <label>
+                終了時刻
+                <select id="timelineEndHour"></select>
+              </label>
+            </div>
+          </details>
+
+          <details class="settings-box">
             <summary>重要度ごとの枠線色</summary>
             <div id="importanceColorSettings" class="settings-body"></div>
           </details>
@@ -3178,8 +3193,8 @@
   </div>
 
   <script>
-    const STORAGE_KEY = "todo-calendar-board-v89";
-    const OLD_KEYS = ["todo-calendar-board-v88", "todo-calendar-board-v87", "todo-calendar-board-v86", "todo-calendar-board-v85", "todo-calendar-board-v84", "todo-calendar-board-v83", "todo-calendar-board-v82", "todo-calendar-board-v81", "todo-calendar-board-v80", "todo-calendar-board-v79", "todo-calendar-board-v78", "todo-calendar-board-v77", "todo-calendar-board-v76", "todo-calendar-board-v75", "todo-calendar-board-v74", "todo-calendar-board-v73", "todo-calendar-board-v72", "todo-calendar-board-v71", "todo-calendar-board-v70", "todo-calendar-board-v69", "todo-calendar-board-v68", "todo-calendar-board-v67", "todo-calendar-board-v66", "todo-calendar-board-v65", "todo-calendar-board-v64", "todo-calendar-board-v63", "todo-calendar-board-v62", "todo-calendar-board-v61", "todo-calendar-board-v60", "todo-calendar-board-v59", "todo-calendar-board-v58", "todo-calendar-board-v57", "todo-calendar-board-v56", "todo-calendar-board-v55", "todo-calendar-board-v54", "todo-calendar-board-v53", "todo-calendar-board-v52", "todo-calendar-board-v51", "todo-calendar-board-v50", "todo-calendar-board-v49", "todo-calendar-board-v48", "todo-calendar-board-v47", "todo-calendar-board-v46", "todo-calendar-board-v45", "todo-calendar-board-v44", "todo-calendar-board-v43", "todo-calendar-board-v42", "todo-calendar-board-v41", "todo-calendar-board-v40", "todo-calendar-board-v39", "todo-calendar-board-v38", "todo-calendar-board-v37", "todo-calendar-board-v36", "todo-calendar-board-v35", "todo-calendar-board-v34", "todo-calendar-board-v33", "todo-calendar-board-v32", "todo-calendar-board-v31", "todo-calendar-board-v30", "todo-calendar-board-v29", "todo-calendar-board-v28", "todo-calendar-board-v27", "todo-calendar-board-v26", "todo-calendar-board-v25", "todo-calendar-board-v24", "todo-calendar-board-v23", "todo-calendar-board-v22", "todo-calendar-board-v21", "todo-calendar-board-v20", "todo-calendar-board-v19", "todo-calendar-board-v18", "todo-calendar-board-v17", "todo-calendar-board-v16", "todo-calendar-board-v15", "todo-calendar-board-v14", "todo-calendar-board-v13", "todo-calendar-board-v12", "todo-calendar-board-v11", "todo-calendar-board-v10", "todo-calendar-board-v9", "todo-calendar-board-v8", "todo-calendar-board-v7", "todo-calendar-board-v6", "todo-calendar-board-v5", "todo-calendar-board-v4", "todo-calendar-board-v3", "todo-calendar-board-v2", "todo-calendar-board-v1"];
+    const STORAGE_KEY = "todo-calendar-board-v90";
+    const OLD_KEYS = ["todo-calendar-board-v89", "todo-calendar-board-v88", "todo-calendar-board-v87", "todo-calendar-board-v86", "todo-calendar-board-v85", "todo-calendar-board-v84", "todo-calendar-board-v83", "todo-calendar-board-v82", "todo-calendar-board-v81", "todo-calendar-board-v80", "todo-calendar-board-v79", "todo-calendar-board-v78", "todo-calendar-board-v77", "todo-calendar-board-v76", "todo-calendar-board-v75", "todo-calendar-board-v74", "todo-calendar-board-v73", "todo-calendar-board-v72", "todo-calendar-board-v71", "todo-calendar-board-v70", "todo-calendar-board-v69", "todo-calendar-board-v68", "todo-calendar-board-v67", "todo-calendar-board-v66", "todo-calendar-board-v65", "todo-calendar-board-v64", "todo-calendar-board-v63", "todo-calendar-board-v62", "todo-calendar-board-v61", "todo-calendar-board-v60", "todo-calendar-board-v59", "todo-calendar-board-v58", "todo-calendar-board-v57", "todo-calendar-board-v56", "todo-calendar-board-v55", "todo-calendar-board-v54", "todo-calendar-board-v53", "todo-calendar-board-v52", "todo-calendar-board-v51", "todo-calendar-board-v50", "todo-calendar-board-v49", "todo-calendar-board-v48", "todo-calendar-board-v47", "todo-calendar-board-v46", "todo-calendar-board-v45", "todo-calendar-board-v44", "todo-calendar-board-v43", "todo-calendar-board-v42", "todo-calendar-board-v41", "todo-calendar-board-v40", "todo-calendar-board-v39", "todo-calendar-board-v38", "todo-calendar-board-v37", "todo-calendar-board-v36", "todo-calendar-board-v35", "todo-calendar-board-v34", "todo-calendar-board-v33", "todo-calendar-board-v32", "todo-calendar-board-v31", "todo-calendar-board-v30", "todo-calendar-board-v29", "todo-calendar-board-v28", "todo-calendar-board-v27", "todo-calendar-board-v26", "todo-calendar-board-v25", "todo-calendar-board-v24", "todo-calendar-board-v23", "todo-calendar-board-v22", "todo-calendar-board-v21", "todo-calendar-board-v20", "todo-calendar-board-v19", "todo-calendar-board-v18", "todo-calendar-board-v17", "todo-calendar-board-v16", "todo-calendar-board-v15", "todo-calendar-board-v14", "todo-calendar-board-v13", "todo-calendar-board-v12", "todo-calendar-board-v11", "todo-calendar-board-v10", "todo-calendar-board-v9", "todo-calendar-board-v8", "todo-calendar-board-v7", "todo-calendar-board-v6", "todo-calendar-board-v5", "todo-calendar-board-v4", "todo-calendar-board-v3", "todo-calendar-board-v2", "todo-calendar-board-v1"];
 
     const initialState = {
       parents: [
@@ -3266,6 +3281,10 @@
         uncertain: "#fef3c7"
       },
       showClassesInTimeline: true,
+      timelineSettings: {
+        startHour: 5,
+        endHour: 24
+      },
       dayTimetableOverrides: {},
       timetableSettings: {
         periodCount: 6,
@@ -3381,6 +3400,8 @@
       selectedCategoryLabel: document.getElementById("selectedCategoryLabel"),
       categoryTodos: document.getElementById("categoryTodos"),
       completedTodos: document.getElementById("completedTodos"),
+      timelineStartHour: document.getElementById("timelineStartHour"),
+      timelineEndHour: document.getElementById("timelineEndHour"),
       importanceColorSettings: document.getElementById("importanceColorSettings"),
       certaintyLabelSettings: document.getElementById("certaintyLabelSettings"),
       certaintyColorSettings: document.getElementById("certaintyColorSettings"),
@@ -3638,6 +3659,20 @@
       if (day < 0 || day > 6) return base;
       const offset = (day - weekdayIndex(base) + 7) % 7;
       return dateOffset(base, offset);
+    }
+
+    function normalizeTimelineSettings(settings) {
+      const defaults = clone(initialState.timelineSettings);
+      const rawStart = Number(settings?.startHour ?? defaults.startHour);
+      const rawEnd = Number(settings?.endHour ?? defaults.endHour);
+      const startHour = Math.max(0, Math.min(23, Number.isFinite(rawStart) ? Math.round(rawStart) : defaults.startHour));
+      let endHour = Math.max(1, Math.min(24, Number.isFinite(rawEnd) ? Math.round(rawEnd) : defaults.endHour));
+      if (endHour <= startHour) endHour = Math.min(24, startHour + 1);
+      return { startHour, endHour };
+    }
+
+    function timelineHourRange() {
+      return normalizeTimelineSettings(state.timelineSettings);
     }
 
     function normalizeTimetableSettings(settings) {
@@ -4325,6 +4360,7 @@
         loaded.certaintyColors = { ...clone(initialState.certaintyColors), ...(parsed.certaintyColors || {}) };
         loaded.certaintyOptions = mergeCertaintyOptions(parsed.certaintyOptions);
         loaded.showClassesInTimeline = typeof parsed.showClassesInTimeline === "boolean" ? parsed.showClassesInTimeline : true;
+        loaded.timelineSettings = normalizeTimelineSettings(parsed.timelineSettings);
         loaded.dayTimetableOverrides = normalizeDayTimetableOverrides(parsed.dayTimetableOverrides);
         loaded.timetableSettings = normalizeTimetableSettings(parsed.timetableSettings);
         loaded.weekSortMode = ["manual", "parent"].includes(parsed.weekSortMode) ? parsed.weekSortMode : "manual";
@@ -4755,8 +4791,7 @@
     }
 
     function renderWeekSchedule(dates) {
-      const startHour = 5;
-      const endHour = 24;
+      const { startHour, endHour } = timelineHourRange();
       const pxPerHour = window.innerWidth <= 720 ? 50 : 54;
       const timelineHeight = (endHour - startHour) * pxPerHour;
 
@@ -5125,8 +5160,7 @@
 
       const allDayHtml = untimedEventHtml;
 
-      const startHour = 5;
-      const endHour = 24;
+      const { startHour, endHour } = timelineHourRange();
       const pxPerHour = 64;
       const timelineHeight = (endHour - startHour) * pxPerHour;
       const timelineStartMinutes = startHour * 60;
@@ -5971,7 +6005,27 @@
       renderAll();
     }
 
+    function renderTimelineSettings() {
+      const { startHour, endHour } = timelineHourRange();
+      const optionHtml = (from, to, selected) => Array.from({ length: to - from + 1 }, (_, index) => {
+        const hour = from + index;
+        const label = String(hour).padStart(2, "0") + ":00";
+        return `<option value="${hour}"${hour === selected ? " selected" : ""}>${label}</option>`;
+      }).join("");
+      els.timelineStartHour.innerHTML = optionHtml(0, 23, startHour);
+      els.timelineEndHour.innerHTML = optionHtml(1, 24, endHour);
+    }
+
+    function updateTimelineSettings() {
+      state.timelineSettings = normalizeTimelineSettings({
+        startHour: els.timelineStartHour.value,
+        endHour: els.timelineEndHour.value
+      });
+      renderAll();
+    }
+
     function renderSettings() {
+      renderTimelineSettings();
       els.importanceColorSettings.innerHTML = ["低", "中", "高"].map(level => `
         <div class="color-row">
           <div class="color-label">${previewDot(importanceColor(level))}重要度: ${escapeHtml(level)}</div>
@@ -6627,6 +6681,7 @@
       state.certaintyOptions = clone(initialState.certaintyOptions);
       state.certaintyColors = clone(initialState.certaintyColors);
       state.classColorPresets = clone(initialState.classColorPresets);
+      state.timelineSettings = clone(initialState.timelineSettings);
       renderAll();
     }
 
@@ -6733,6 +6788,8 @@
       console.assert(monthSpanInfoForEntry({ todo: { kind: "event", id: "x", date: "2026-05-01", endDate: "2026-05-03" }, isCarryOver: false }, "2026-05-02").className.includes("middle"), "middle day of multi-day month event should be a connected middle segment");
       console.assert(safeImageSrc("data:image/jpeg;base64,AAAA") !== "", "image data URL should be accepted");
       console.assert(["todo", "calendar"].includes(currentWeekBoardMode()), "week board mode should be valid");
+      console.assert(normalizeTimelineSettings({ startHour: 5, endHour: 24 }).startHour === 5, "timeline start hour should normalize");
+      console.assert(normalizeTimelineSettings({ startHour: 12, endHour: 9 }).endHour === 13, "timeline end hour should remain after start hour");
     }
 
     document.querySelectorAll("[data-view-button]").forEach(button => {
@@ -6918,6 +6975,8 @@
     els.addTodo.addEventListener("click", addTodo);
     els.addParent.addEventListener("click", addParent);
     els.addChild.addEventListener("click", addChild);
+    els.timelineStartHour.addEventListener("change", updateTimelineSettings);
+    els.timelineEndHour.addEventListener("change", updateTimelineSettings);
     els.resetVisualSettings.addEventListener("click", resetVisualSettings);
     els.exportData.addEventListener("click", exportData);
     els.importData.addEventListener("click", importData);
