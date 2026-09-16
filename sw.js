@@ -1,4 +1,4 @@
-const CACHE_NAME = "todo-calendar-board-v92";
+const CACHE_NAME = "todo-calendar-board-v93";
 const ASSETS = [
   "./",
   "./index.html",

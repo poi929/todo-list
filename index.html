@@ -3229,8 +3229,8 @@
   </div>
 
   <script>
-    const STORAGE_KEY = "todo-calendar-board-v92";
-    const OLD_KEYS = ["todo-calendar-board-v91", "todo-calendar-board-v90", "todo-calendar-board-v89", "todo-calendar-board-v88", "todo-calendar-board-v87", "todo-calendar-board-v86", "todo-calendar-board-v85", "todo-calendar-board-v84", "todo-calendar-board-v83", "todo-calendar-board-v82", "todo-calendar-board-v81", "todo-calendar-board-v80", "todo-calendar-board-v79", "todo-calendar-board-v78", "todo-calendar-board-v77", "todo-calendar-board-v76", "todo-calendar-board-v75", "todo-calendar-board-v74", "todo-calendar-board-v73", "todo-calendar-board-v72", "todo-calendar-board-v71", "todo-calendar-board-v70", "todo-calendar-board-v69", "todo-calendar-board-v68", "todo-calendar-board-v67", "todo-calendar-board-v66", "todo-calendar-board-v65", "todo-calendar-board-v64", "todo-calendar-board-v63", "todo-calendar-board-v62", "todo-calendar-board-v61", "todo-calendar-board-v60", "todo-calendar-board-v59", "todo-calendar-board-v58", "todo-calendar-board-v57", "todo-calendar-board-v56", "todo-calendar-board-v55", "todo-calendar-board-v54", "todo-calendar-board-v53", "todo-calendar-board-v52", "todo-calendar-board-v51", "todo-calendar-board-v50", "todo-calendar-board-v49", "todo-calendar-board-v48", "todo-calendar-board-v47", "todo-calendar-board-v46", "todo-calendar-board-v45", "todo-calendar-board-v44", "todo-calendar-board-v43", "todo-calendar-board-v42", "todo-calendar-board-v41", "todo-calendar-board-v40", "todo-calendar-board-v39", "todo-calendar-board-v38", "todo-calendar-board-v37", "todo-calendar-board-v36", "todo-calendar-board-v35", "todo-calendar-board-v34", "todo-calendar-board-v33", "todo-calendar-board-v32", "todo-calendar-board-v31", "todo-calendar-board-v30", "todo-calendar-board-v29", "todo-calendar-board-v28", "todo-calendar-board-v27", "todo-calendar-board-v26", "todo-calendar-board-v25", "todo-calendar-board-v24", "todo-calendar-board-v23", "todo-calendar-board-v22", "todo-calendar-board-v21", "todo-calendar-board-v20", "todo-calendar-board-v19", "todo-calendar-board-v18", "todo-calendar-board-v17", "todo-calendar-board-v16", "todo-calendar-board-v15", "todo-calendar-board-v14", "todo-calendar-board-v13", "todo-calendar-board-v12", "todo-calendar-board-v11", "todo-calendar-board-v10", "todo-calendar-board-v9", "todo-calendar-board-v8", "todo-calendar-board-v7", "todo-calendar-board-v6", "todo-calendar-board-v5", "todo-calendar-board-v4", "todo-calendar-board-v3", "todo-calendar-board-v2", "todo-calendar-board-v1"];
+    const STORAGE_KEY = "todo-calendar-board-v93";
+    const OLD_KEYS = ["todo-calendar-board-v92", "todo-calendar-board-v91", "todo-calendar-board-v90", "todo-calendar-board-v89", "todo-calendar-board-v88", "todo-calendar-board-v87", "todo-calendar-board-v86", "todo-calendar-board-v85", "todo-calendar-board-v84", "todo-calendar-board-v83", "todo-calendar-board-v82", "todo-calendar-board-v81", "todo-calendar-board-v80", "todo-calendar-board-v79", "todo-calendar-board-v78", "todo-calendar-board-v77", "todo-calendar-board-v76", "todo-calendar-board-v75", "todo-calendar-board-v74", "todo-calendar-board-v73", "todo-calendar-board-v72", "todo-calendar-board-v71", "todo-calendar-board-v70", "todo-calendar-board-v69", "todo-calendar-board-v68", "todo-calendar-board-v67", "todo-calendar-board-v66", "todo-calendar-board-v65", "todo-calendar-board-v64", "todo-calendar-board-v63", "todo-calendar-board-v62", "todo-calendar-board-v61", "todo-calendar-board-v60", "todo-calendar-board-v59", "todo-calendar-board-v58", "todo-calendar-board-v57", "todo-calendar-board-v56", "todo-calendar-board-v55", "todo-calendar-board-v54", "todo-calendar-board-v53", "todo-calendar-board-v52", "todo-calendar-board-v51", "todo-calendar-board-v50", "todo-calendar-board-v49", "todo-calendar-board-v48", "todo-calendar-board-v47", "todo-calendar-board-v46", "todo-calendar-board-v45", "todo-calendar-board-v44", "todo-calendar-board-v43", "todo-calendar-board-v42", "todo-calendar-board-v41", "todo-calendar-board-v40", "todo-calendar-board-v39", "todo-calendar-board-v38", "todo-calendar-board-v37", "todo-calendar-board-v36", "todo-calendar-board-v35", "todo-calendar-board-v34", "todo-calendar-board-v33", "todo-calendar-board-v32", "todo-calendar-board-v31", "todo-calendar-board-v30", "todo-calendar-board-v29", "todo-calendar-board-v28", "todo-calendar-board-v27", "todo-calendar-board-v26", "todo-calendar-board-v25", "todo-calendar-board-v24", "todo-calendar-board-v23", "todo-calendar-board-v22", "todo-calendar-board-v21", "todo-calendar-board-v20", "todo-calendar-board-v19", "todo-calendar-board-v18", "todo-calendar-board-v17", "todo-calendar-board-v16", "todo-calendar-board-v15", "todo-calendar-board-v14", "todo-calendar-board-v13", "todo-calendar-board-v12", "todo-calendar-board-v11", "todo-calendar-board-v10", "todo-calendar-board-v9", "todo-calendar-board-v8", "todo-calendar-board-v7", "todo-calendar-board-v6", "todo-calendar-board-v5", "todo-calendar-board-v4", "todo-calendar-board-v3", "todo-calendar-board-v2", "todo-calendar-board-v1"];
 
     const initialState = {
       parents: [
@@ -3796,11 +3796,67 @@
       return normalized;
     }
 
+    function timetableClassCount(timetables) {
+      if (!Array.isArray(timetables)) return 0;
+      return timetables.reduce((sum, item) => sum + (Array.isArray(item?.classes) ? item.classes.length : 0), 0);
+    }
+
+    function readStoredStateForKey(key) {
+      try {
+        const raw = localStorage.getItem(key);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === "object" ? parsed : null;
+      } catch {
+        return null;
+      }
+    }
+
+    function findRecoverableTimetableState() {
+      for (const key of OLD_KEYS) {
+        const stored = readStoredStateForKey(key);
+        if (!stored) continue;
+
+        if (Array.isArray(stored.timetables) && timetableClassCount(stored.timetables) > 0) {
+          return {
+            timetables: stored.timetables,
+            activeTimetableId: stored.activeTimetableId || "",
+            classes: [],
+            timetableSettings: stored.timetableSettings || initialState.timetableSettings
+          };
+        }
+
+        if (Array.isArray(stored.classes) && stored.classes.length > 0) {
+          return {
+            timetables: [],
+            activeTimetableId: "timetable-main",
+            classes: stored.classes,
+            timetableSettings: stored.timetableSettings || initialState.timetableSettings
+          };
+        }
+      }
+      return null;
+    }
+
     function hydrateTimetableState(loaded, parsed = {}) {
       const presets = loaded.classColorPresets || initialState.classColorPresets;
       const legacyClasses = Array.isArray(parsed.classes) ? parsed.classes : (Array.isArray(loaded.classes) ? loaded.classes : []);
       const legacySettings = parsed.timetableSettings || loaded.timetableSettings || initialState.timetableSettings;
-      loaded.timetables = normalizeTimetables(parsed.timetables || loaded.timetables, legacyClasses, legacySettings, presets);
+      const parsedTimetables = Array.isArray(parsed.timetables) ? parsed.timetables : [];
+      const hasLegacyClasses = legacyClasses.length > 0;
+      const hasParsedTimetableClasses = timetableClassCount(parsedTimetables) > 0;
+      const rawTimetables = parsedTimetables.length && (hasParsedTimetableClasses || !hasLegacyClasses) ? parsedTimetables : [];
+      loaded.timetables = normalizeTimetables(rawTimetables, legacyClasses, legacySettings, presets);
+
+      if (timetableClassCount(loaded.timetables) === 0) {
+        const recovered = findRecoverableTimetableState();
+        if (recovered) {
+          const recoveredLegacyClasses = Array.isArray(recovered.classes) ? recovered.classes : [];
+          loaded.timetables = normalizeTimetables(recovered.timetables, recoveredLegacyClasses, recovered.timetableSettings, presets);
+          loaded.activeTimetableId = recovered.activeTimetableId || loaded.activeTimetableId;
+        }
+      }
+
       const requestedId = String(parsed.activeTimetableId || loaded.activeTimetableId || "");
       const active = loaded.timetables.find(item => item.id === requestedId) || loaded.timetables[0];
       loaded.activeTimetableId = active.id;
