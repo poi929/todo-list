@@ -131,11 +131,19 @@
     h1 {
       margin: 0;
       font-size: 23px;
-      letter-spacing: -0.02em;
+      letter-spacing: 0.02em;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    h2, h3 {
+      margin: 0;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
     }
 
     h2 {
-      margin: 0;
       font-size: 19px;
     }
 
@@ -1960,6 +1968,22 @@
       font-weight: 800;
     }
 
+    .timetable-manager {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: #f8fafc;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+
+    .timetable-manager .actions {
+      margin-top: 8px;
+    }
+
+    .timetable-status {
+      margin-top: 8px;
+    }
+
     .timetable-wrap {
       overflow-x: hidden;
       border-radius: 14px;
@@ -2627,6 +2651,26 @@
             </div>
           </div>
 
+          <section class="timetable-manager" aria-label="時間割セット管理">
+            <div class="two">
+              <label>
+                表示する時間割
+                <select id="timetableSelect"></select>
+              </label>
+
+              <label>
+                時間割名
+                <input id="timetableNameInput" placeholder="例: Aセメ時間割" />
+              </label>
+            </div>
+            <div class="actions">
+              <button id="renameTimetable" class="secondary">名前を保存</button>
+              <button id="addTimetable" class="secondary">時間割を追加</button>
+              <button id="deleteTimetable" class="secondary">この時間割を削除</button>
+            </div>
+            <p id="timetableStatus" class="desc timetable-status">表示中の時間割を選ぶと、日別・週予定カレンダーにも反映されます。</p>
+          </section>
+
           <details class="settings-box" style="margin-bottom:12px;">
             <summary>時間割の設定</summary>
             <div class="settings-body">
@@ -3024,7 +3068,7 @@
         <div class="override-makeup-box">
           <div>
             <h3 style="margin:0; font-size:15px;">この日だけ補講を追加</h3>
-            <p class="desc">通常登録している時間割から授業を選び、この日の日別・週予定カレンダーだけに追加します。</p>
+            <p class="desc">表示中の時間割から授業を選び、この日の日別・週予定カレンダーだけに追加します。</p>
           </div>
 
           <div>
@@ -3266,6 +3310,25 @@
       categorySearchQuery: "",
       monthCursor: todayString(),
       lastKnownToday: todayString(),
+      activeTimetableId: "timetable-main",
+      timetables: [
+        {
+          id: "timetable-main",
+          name: "時間割1",
+          classes: [],
+          timetableSettings: {
+            periodCount: 6,
+            periods: {
+              1: { start: "08:30", end: "10:15" },
+              2: { start: "10:25", end: "12:10" },
+              3: { start: "13:00", end: "14:45" },
+              4: { start: "14:55", end: "16:40" },
+              5: { start: "16:50", end: "18:35" },
+              6: { start: "18:45", end: "20:30" }
+            }
+          }
+        }
+      ],
       classes: [],
       classColorPresets: [
         { id: "blue", name: "青", color: "#bfdbfe" },
@@ -3324,6 +3387,7 @@
     };
 
     let state = loadState();
+    syncActiveTimetableAliases();
     let pendingTodoImageData = "";
     let pendingEditImageData = "";
     let dayOverrideDraftExtraClasses = [];
@@ -3411,6 +3475,12 @@
       importData: document.getElementById("importData"),
       dataStatus: document.getElementById("dataStatus"),
       timetableGrid: document.getElementById("timetableGrid"),
+      timetableSelect: document.getElementById("timetableSelect"),
+      timetableNameInput: document.getElementById("timetableNameInput"),
+      renameTimetable: document.getElementById("renameTimetable"),
+      addTimetable: document.getElementById("addTimetable"),
+      deleteTimetable: document.getElementById("deleteTimetable"),
+      timetableStatus: document.getElementById("timetableStatus"),
       periodCount: document.getElementById("periodCount"),
       periodTimeSettings: document.getElementById("periodTimeSettings"),
       clearSelectedClass: document.getElementById("clearSelectedClass"),
@@ -3691,6 +3761,153 @@
       return { periodCount, periods };
     }
 
+    function normalizeTimetableName(value, fallback = "時間割") {
+      const name = String(value || "").trim().slice(0, 30);
+      return name || fallback;
+    }
+
+    function normalizeTimetableItem(item, index, presets, legacyClasses = [], legacySettings = null) {
+      const id = String(item?.id || makeId("timetable"));
+      const name = normalizeTimetableName(item?.name, `時間割${index + 1}`);
+      const rawClasses = Array.isArray(item?.classes) ? item.classes : legacyClasses;
+      const rawSettings = item?.timetableSettings || item?.settings || legacySettings || initialState.timetableSettings;
+      return {
+        id,
+        name,
+        classes: rawClasses.map(classItem => normalizeClassItem(classItem, presets)),
+        timetableSettings: normalizeTimetableSettings(rawSettings)
+      };
+    }
+
+    function normalizeTimetables(rawTimetables, legacyClasses = [], legacySettings = null, presets = initialState.classColorPresets) {
+      const sourceList = Array.isArray(rawTimetables) && rawTimetables.length ? rawTimetables : [];
+      const usedIds = new Set();
+      const normalized = sourceList.map((item, index) => {
+        const normalizedItem = normalizeTimetableItem(item, index, presets, [], null);
+        if (!normalizedItem.id || usedIds.has(normalizedItem.id)) {
+          normalizedItem.id = makeId("timetable");
+        }
+        usedIds.add(normalizedItem.id);
+        return normalizedItem;
+      });
+
+      if (!normalized.length) {
+        normalized.push(normalizeTimetableItem(
+          { id: "timetable-main", name: "時間割1", classes: legacyClasses, timetableSettings: legacySettings },
+          0,
+          presets,
+          legacyClasses,
+          legacySettings
+        ));
+      }
+
+      return normalized;
+    }
+
+    function hydrateTimetableState(loaded, parsed = {}) {
+      const presets = loaded.classColorPresets || initialState.classColorPresets;
+      const legacyClasses = Array.isArray(parsed.classes) ? parsed.classes : (Array.isArray(loaded.classes) ? loaded.classes : []);
+      const legacySettings = parsed.timetableSettings || loaded.timetableSettings || initialState.timetableSettings;
+      loaded.timetables = normalizeTimetables(parsed.timetables || loaded.timetables, legacyClasses, legacySettings, presets);
+      const requestedId = String(parsed.activeTimetableId || loaded.activeTimetableId || "");
+      const active = loaded.timetables.find(item => item.id === requestedId) || loaded.timetables[0];
+      loaded.activeTimetableId = active.id;
+      loaded.classes = active.classes;
+      loaded.timetableSettings = active.timetableSettings;
+      return loaded;
+    }
+
+    function createLoadedInitialState() {
+      const loaded = clone(initialState);
+      loaded.classColorPresets = mergeClassColorPresets(loaded.classColorPresets);
+      hydrateTimetableState(loaded, loaded);
+      return loaded;
+    }
+
+    function activeTimetable() {
+      if (!Array.isArray(state.timetables) || !state.timetables.length) {
+        state.timetables = normalizeTimetables([], state.classes || [], state.timetableSettings || initialState.timetableSettings, state.classColorPresets || initialState.classColorPresets);
+        state.activeTimetableId = state.timetables[0].id;
+      }
+      let active = state.timetables.find(item => item.id === state.activeTimetableId);
+      if (!active) {
+        active = state.timetables[0];
+        state.activeTimetableId = active.id;
+      }
+      return active;
+    }
+
+    function syncActiveTimetableAliases() {
+      if (!state) return;
+      const active = activeTimetable();
+      state.classes = active.classes;
+      state.timetableSettings = active.timetableSettings;
+    }
+
+    function persistActiveTimetableAliases() {
+      if (!state || !Array.isArray(state.timetables) || !state.timetables.length) return;
+      const active = activeTimetable();
+      active.classes = Array.isArray(state.classes) ? state.classes : [];
+      active.timetableSettings = normalizeTimetableSettings(state.timetableSettings || active.timetableSettings);
+      state.classes = active.classes;
+      state.timetableSettings = active.timetableSettings;
+    }
+
+    function activeTimetableLabel() {
+      return activeTimetable().name || "時間割";
+    }
+
+    function switchActiveTimetable(id) {
+      persistActiveTimetableAliases();
+      const next = state.timetables.find(item => item.id === id);
+      if (!next) return;
+      state.activeTimetableId = next.id;
+      syncActiveTimetableAliases();
+      clearClassEditor();
+      closeClassEditor();
+      renderAll();
+    }
+
+    function addTimetable() {
+      persistActiveTimetableAliases();
+      const nextNumber = state.timetables.length + 1;
+      const item = normalizeTimetableItem(
+        { id: makeId("timetable"), name: `時間割${nextNumber}`, classes: [], timetableSettings: initialState.timetableSettings },
+        nextNumber - 1,
+        state.classColorPresets
+      );
+      state.timetables.push(item);
+      state.activeTimetableId = item.id;
+      syncActiveTimetableAliases();
+      clearClassEditor();
+      closeClassEditor();
+      renderAll();
+    }
+
+    function renameActiveTimetable() {
+      const active = activeTimetable();
+      const name = normalizeTimetableName(els.timetableNameInput.value, active.name || "時間割");
+      active.name = name;
+      if (els.timetableNameInput) els.timetableNameInput.value = name;
+      renderAll();
+    }
+
+    function deleteActiveTimetable() {
+      if (!Array.isArray(state.timetables) || state.timetables.length <= 1) {
+        alert("時間割は1つ以上必要です。");
+        return;
+      }
+      const active = activeTimetable();
+      if (!confirm(`時間割「${active.name || "時間割"}」を削除しますか？
+この時間割に登録した授業も削除されます。`)) return;
+      state.timetables = state.timetables.filter(item => item.id !== active.id);
+      state.activeTimetableId = state.timetables[0].id;
+      syncActiveTimetableAliases();
+      clearClassEditor();
+      closeClassEditor();
+      renderAll();
+    }
+
     function defaultPeriodTimes(period) {
       const data = state.timetableSettings?.periods?.[Number(period)];
       return [data?.start || "", data?.end || ""];
@@ -3912,18 +4129,9 @@
       return ["daily", "weekly", "biweekly", "monthly"].includes(String(value || "")) ? String(value) : "none";
     }
 
-    function itemRepeatMode(todo) {
-      return normalizeEventRepeatMode(todo?.repeatMode);
-    }
-
     function eventRepeatMode(todo) {
       if ((todo.kind || "todo") !== "event") return "none";
-      return itemRepeatMode(todo);
-    }
-
-    function todoRepeatMode(todo) {
-      if ((todo.kind || "todo") !== "todo") return "none";
-      return itemRepeatMode(todo);
+      return normalizeEventRepeatMode(todo.repeatMode);
     }
 
     function normalizeRepeatUntil(value, startDate) {
@@ -3932,16 +4140,12 @@
       return value < start ? "" : String(value);
     }
 
-    function itemRepeatUntil(todo) {
-      return normalizeRepeatUntil(todo.repeatUntil, todo.date);
-    }
-
     function eventRepeatUntil(todo) {
       return normalizeRepeatUntil(todo.repeatUntil, eventStartDate(todo));
     }
 
-    function itemRepeatLabel(todo) {
-      const mode = itemRepeatMode(todo);
+    function eventRepeatLabel(todo) {
+      const mode = eventRepeatMode(todo);
       const labels = {
         none: "なし",
         daily: "毎日",
@@ -3950,12 +4154,8 @@
         monthly: "毎月"
       };
       if (mode === "none") return "なし";
-      const until = itemRepeatUntil(todo);
+      const until = eventRepeatUntil(todo);
       return labels[mode] + (until ? "・" + dateLabel(until) + "まで" : "・期限なし");
-    }
-
-    function eventRepeatLabel(todo) {
-      return itemRepeatLabel(todo);
     }
 
     function eventScheduleLabel(todo) {
@@ -3978,63 +4178,6 @@
       const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0, 12).getDate();
       target.setDate(Math.min(wantedDay, lastDay));
       return toDateString(target);
-    }
-
-
-    function todoOccursOnDate(todo, dateString) {
-      if ((todo.kind || "todo") !== "todo") return false;
-      const date = normalizeDateString(dateString);
-      const start = normalizeDateString(todo.date);
-      const mode = todoRepeatMode(todo);
-      const until = itemRepeatUntil(todo);
-      if (date < start || (until && date > until)) return false;
-      if (mode === "none") return date === start;
-      const diff = dateDiffDays(start, date);
-      if (mode === "daily") return true;
-      if (mode === "weekly") return diff % 7 === 0;
-      if (mode === "biweekly") return diff % 14 === 0;
-      if (mode === "monthly") {
-        let index = 0;
-        let occurrence = start;
-        while (occurrence <= date) {
-          if (occurrence === date) return true;
-          index += 1;
-          if (index > 600) break;
-          occurrence = addMonthsKeepingDay(start, index);
-        }
-      }
-      return false;
-    }
-
-    function recurringTodoDoneDates(todo) {
-      return Array.isArray(todo.doneDates)
-        ? [...new Set(todo.doneDates.filter(isValidDateString))].sort()
-        : [];
-    }
-
-    function isRecurringTodo(todo) {
-      return (todo.kind || "todo") === "todo" && todoRepeatMode(todo) !== "none";
-    }
-
-    function isTodoDoneOnDate(todo, dateString = "") {
-      if ((todo.kind || "todo") !== "todo") return false;
-      if (!isRecurringTodo(todo)) return Boolean(todo.done);
-      const date = isValidDateString(dateString) ? dateString : "";
-      return date ? recurringTodoDoneDates(todo).includes(date) : false;
-    }
-
-    function setTodoDoneOnDate(todo, dateString, done) {
-      if (!isRecurringTodo(todo)) {
-        todo.done = Boolean(done);
-        return;
-      }
-      const date = normalizeDateString(dateString || todo.date);
-      const doneDates = recurringTodoDoneDates(todo);
-      const set = new Set(doneDates);
-      if (done) set.add(date);
-      else set.delete(date);
-      todo.doneDates = [...set].sort();
-      todo.done = false;
     }
 
     function eventOccurrenceRangeOnDate(todo, dateString) {
@@ -4418,7 +4561,7 @@
             if (raw) break;
           }
         }
-        if (!raw) return clone(initialState);
+        if (!raw) return createLoadedInitialState();
         const parsed = JSON.parse(raw);
         const loaded = {
           ...clone(initialState),
@@ -4449,9 +4592,8 @@
           const certaintyId = kind === "event"
             ? (todo.certaintyId === "candidate" ? "uncertain" : (todo.certaintyId || "confirmed"))
             : "";
-          const repeatMode = normalizeEventRepeatMode(todo.repeatMode);
-          const repeatUntil = repeatMode !== "none" ? normalizeRepeatUntil(todo.repeatUntil, date) : "";
-          const doneDates = kind === "todo" ? recurringTodoDoneDates(todo) : [];
+          const repeatMode = kind === "event" ? normalizeEventRepeatMode(todo.repeatMode) : "none";
+          const repeatUntil = kind === "event" && repeatMode !== "none" ? normalizeRepeatUntil(todo.repeatUntil, date) : "";
           return {
             ...todo,
             kind,
@@ -4465,13 +4607,12 @@
             certaintyId,
             repeatMode,
             repeatUntil,
-            doneDates,
             imageData: safeImageSrc(todo.imageData)
           };
         });
         loaded.todos = loaded.todos.map(({ minutes, ...todo }) => todo);
         loaded.classColorPresets = mergeClassColorPresets(loaded.classColorPresets);
-        loaded.classes = loaded.classes.map(classItem => normalizeClassItem(classItem, loaded.classColorPresets));
+        hydrateTimetableState(loaded, parsed);
         loaded.selectedDate = loaded.selectedDate || todayString();
         loaded.filterParentId = loaded.filterParentId || "all";
         loaded.filterChildId = loaded.filterChildId || "all";
@@ -4481,12 +4622,13 @@
         loaded.lastKnownToday = loaded.lastKnownToday || todayString();
         return loaded;
       } catch {
-        return clone(initialState);
+        return createLoadedInitialState();
       }
     }
 
     function saveState() {
       try {
+        persistActiveTimetableAliases();
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       } catch (error) {
         console.warn("保存に失敗しました。", error);
@@ -4606,7 +4748,7 @@
     }
 
     function isOverdueTodo(todo) {
-      return (todo.kind || "todo") === "todo" && !isRecurringTodo(todo) && !todo.done && todo.date < todayString();
+      return (todo.kind || "todo") === "todo" && !todo.done && todo.date < todayString();
     }
 
     function getCertaintyOption(id) {
@@ -4698,18 +4840,18 @@
       const base = state.todos
         .filter(todo => {
           if ((todo.kind || "todo") === "event") return isEventOnDate(todo, date);
-          return todoOccursOnDate(todo, date);
+          return todo.date === date;
         })
-        .map(todo => ({ todo, isCarryOver: false, occurrenceDate: date }));
+        .map(todo => ({ todo, isCarryOver: false }));
 
       if (date === todayString()) {
         const carried = state.todos
           .filter(isOverdueTodo)
-          .map(todo => ({ todo, isCarryOver: true, occurrenceDate: todo.date }));
+          .map(todo => ({ todo, isCarryOver: true }));
         return [...carried, ...base].sort((a, b) => {
           const rankA = a.isCarryOver ? importanceRank("高") : importanceRank(a.todo.importance);
           const rankB = b.isCarryOver ? importanceRank("高") : importanceRank(b.todo.importance);
-          return rankB - rankA || String(a.occurrenceDate || a.todo.date || "").localeCompare(String(b.occurrenceDate || b.todo.date || ""));
+          return rankB - rankA || String(a.todo.date || "").localeCompare(String(b.todo.date || ""));
         });
       }
 
@@ -4720,7 +4862,7 @@
       const counts = { "高": 0, "中": 0, "低": 0 };
       effectiveTodosForDate(dateString).forEach(entry => {
         const todo = entry.todo;
-        if ((todo.kind || "todo") === "event" || isTodoDoneOnDate(todo, entry.occurrenceDate)) return;
+        if ((todo.kind || "todo") === "event" || todo.done) return;
         const level = entry.isCarryOver ? "高" : (["高", "中", "低"].includes(todo.importance) ? todo.importance : "中");
         counts[level] += 1;
       });
@@ -5000,9 +5142,9 @@
       els.eventStartTimeField.classList.toggle("hidden-field", !isEvent);
       els.eventEndTimeField.classList.toggle("hidden-field", !isEvent);
       els.todoCertaintyField.classList.toggle("hidden-field", !isEvent);
-      els.todoRepeatFields.classList.remove("hidden-field");
-      els.todoRepeatNote.classList.remove("hidden-field");
-      els.todoRepeatUntilField.classList.toggle("hidden-field", els.todoRepeatMode.value === "none");
+      els.todoRepeatFields.classList.toggle("hidden-field", !isEvent);
+      els.todoRepeatNote.classList.toggle("hidden-field", !isEvent);
+      els.todoRepeatUntilField.classList.toggle("hidden-field", !isEvent || els.todoRepeatMode.value === "none");
       if (isEvent) {
         const startDate = els.todoDate.value || todayString();
         els.todoEndDate.value = normalizeEndDateForStart(startDate, els.todoEndDate.value || startDate);
@@ -5086,7 +5228,7 @@
 
           return `
             <td>
-              ${cellTodos.map(entry => miniTodoHtml(entry.todo, entry.isCarryOver, entry.occurrenceDate)).join("")}
+              ${cellTodos.map(entry => miniTodoHtml(entry.todo, entry.isCarryOver)).join("")}
             </td>
           `;
         }).join("");
@@ -5123,21 +5265,20 @@
       els.matrixTable.innerHTML = `<table>${header}<tbody>${body}</tbody></table>`;
     }
 
-    function miniTodoHtml(todo, isCarryOver, occurrenceDate = "") {
-      const isDone = !isCarryOver && isTodoDoneOnDate(todo, occurrenceDate);
+    function miniTodoHtml(todo, isCarryOver) {
+      const isDone = todo.done && !isCarryOver;
       const certainty = certaintyLabel(todo.certaintyId);
       const importanceText = isCarryOver ? "高" : todo.importance;
-      const dateAttr = occurrenceDate ? ` data-date="${escapeHtml(occurrenceDate)}"` : "";
       return `
         <div class="mini-todo ${isDone ? "done" : ""} ${isCarryOver ? "overdue" : ""}" style="${visualStyleForTodo(todo, isCarryOver)}">
           <div class="mini-row">
-            <button class="small-btn" data-action="toggle" data-id="${escapeHtml(todo.id)}"${dateAttr} title="完了切り替え">✓</button>
+            <button class="small-btn" data-action="toggle" data-id="${escapeHtml(todo.id)}" title="完了切り替え">✓</button>
             <div class="task-clickable" data-action="edit" data-id="${escapeHtml(todo.id)}" style="min-width:0; flex:1;">
               <p class="mini-title ${isDone ? "done" : ""}">${escapeHtml(todo.kind === "event" && todo.startTime ? todo.startTime + " " + todo.title : todo.title)}</p>
               <p class="mini-meta">
                 <span class="importance-badge" style="background:${importanceColor(importanceText)}">${escapeHtml(importanceText)}</span>
                 ${todo.kind === "event" || isCarryOver ? `<span class="certainty-badge">${escapeHtml(isCarryOver ? "期限切れ" : certainty)}</span>` : ""}
-                ${itemRepeatMode(todo) !== "none" ? `<span class="badge">${escapeHtml(itemRepeatLabel(todo))}</span>` : ""}
+                ${todo.kind === "event" && eventRepeatMode(todo) !== "none" ? `<span class="badge">${escapeHtml(eventRepeatLabel(todo))}</span>` : ""}
                 ${todo.imageData ? `<span class="badge">画像</span>` : ""}
               </p>
             </div>
@@ -5158,19 +5299,12 @@
         const todo = entry.todo || entry;
         const isCarryOver = Boolean(entry.isCarryOver);
         const category = categories.find(item => item.childId === todo.childId);
-        const occurrenceDate = entry.occurrenceDate || "";
-        const isDone = !isCarryOver && isTodoDoneOnDate(todo, occurrenceDate);
-        const dateAttr = occurrenceDate ? ` data-date="${escapeHtml(occurrenceDate)}"` : "";
-        const shownDeadline = todo.kind === "event"
-          ? eventScheduleLabel(todo)
-          : (occurrenceDate && isRecurringTodo(todo)
-            ? (todo.deadlineTime ? dateLabel(occurrenceDate) + " " + todo.deadlineTime : dateLabel(occurrenceDate))
-            : deadlineText(todo));
+        const isDone = todo.done && !isCarryOver;
 
         return `
           <article class="todo-card ${isCarryOver ? "overdue" : ""}" style="${visualStyleForTodo(todo, isCarryOver)}">
             <div class="todo-left">
-              ${todo.kind !== "event" && (occurrenceDate || !isRecurringTodo(todo)) ? `<input type="checkbox" data-action="toggle" data-id="${escapeHtml(todo.id)}"${dateAttr} ${isDone ? "checked" : ""} />` : ""}
+              ${todo.kind !== "event" ? `<input type="checkbox" data-action="toggle" data-id="${escapeHtml(todo.id)}" ${todo.done ? "checked" : ""} />` : ""}
               <div class="todo-main task-clickable" data-action="edit" data-id="${escapeHtml(todo.id)}">
                 <p class="todo-title ${isDone ? "done" : ""} ${isCarryOver ? "overdue" : ""}">${escapeHtml(todo.title)}</p>
                 <p class="todo-detail">${escapeHtml(todo.detail || "詳細なし")}</p>
@@ -5178,9 +5312,8 @@
                 <div class="todo-meta">
                   <span class="kind-badge">${escapeHtml(kindLabel(todo.kind))}</span>
                   <span class="badge">${escapeHtml(category?.label || "カテゴリ不明")}</span>
-                  <span class="badge">${escapeHtml(isCarryOver ? "元の締切: " + deadlineText(todo) : (todo.kind === "event" ? eventScheduleLabel(todo) : "締切: " + shownDeadline))}</span>
+                  <span class="badge">${escapeHtml(isCarryOver ? "元の締切: " + deadlineText(todo) : (todo.kind === "event" ? eventScheduleLabel(todo) : "締切: " + deadlineText(todo)))}</span>
                   ${todo.kind === "event" ? `<span class="badge">${escapeHtml(timeText(todo))}</span>${todo.location ? `<span class="badge">${escapeHtml(todo.location)}</span>` : ""}` : ""}
-                  ${itemRepeatMode(todo) !== "none" ? `<span class="badge">繰り返し: ${escapeHtml(itemRepeatLabel(todo))}</span>` : ""}
                   ${todo.kind !== "event" ? `<span class="importance-badge" style="background:${importanceColor(isCarryOver ? "高" : todo.importance)}">重要度: ${isCarryOver ? "高" : escapeHtml(todo.importance)}</span>` : ""}
                   ${todo.kind === "event" || isCarryOver ? `<span class="certainty-badge" style="${todo.kind === "event" ? "border-color:" + certaintyColor(todo.certaintyId) + "; background:" + certaintyColor(todo.certaintyId) : ""}">${escapeHtml(isCarryOver ? "期限切れ" : certaintyLabel(todo.certaintyId))}</span>` : ""}
                   ${todo.imageData ? `<span class="badge">参考画像あり</span>` : ""}
@@ -5732,13 +5865,10 @@
     }
 
     function renderCompleted() {
-      const entries = state.todos.flatMap(todo => {
-        if ((todo.kind || "todo") !== "todo") return [];
-        if (isRecurringTodo(todo)) {
-          return recurringTodoDoneDates(todo).map(occurrenceDate => ({ todo, isCarryOver: false, occurrenceDate }));
-        }
-        return todo.done ? [{ todo, isCarryOver: false, occurrenceDate: todo.date }] : [];
-      }).sort((a, b) => String(b.occurrenceDate || b.todo.date || "").localeCompare(String(a.occurrenceDate || a.todo.date || "")));
+      const entries = state.todos
+        .filter(todo => todo.done)
+        .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")))
+        .map(todo => ({ todo, isCarryOver: false }));
 
       els.completedTodos.innerHTML = todoListHtml(entries, "達成済みのタスクはありません。");
     }
@@ -5895,7 +6025,22 @@
       }).join("");
     }
 
+    function renderTimetableManager() {
+      if (!els.timetableSelect || !els.timetableNameInput) return;
+      persistActiveTimetableAliases();
+      const active = activeTimetable();
+      els.timetableSelect.innerHTML = state.timetables.map(item => `
+        <option value="${escapeHtml(item.id)}"${item.id === active.id ? " selected" : ""}>${escapeHtml(item.name || "時間割")}</option>
+      `).join("");
+      els.timetableNameInput.value = active.name || "時間割";
+      if (els.deleteTimetable) els.deleteTimetable.disabled = state.timetables.length <= 1;
+      if (els.timetableStatus) {
+        els.timetableStatus.textContent = `表示中: ${active.name || "時間割"}（授業 ${active.classes.length}件）。日別・週予定カレンダーにはこの時間割が反映されます。`;
+      }
+    }
+
     function renderTimetable() {
+      renderTimetableManager();
       renderTimetableSettings();
       const days = [1, 2, 3, 4, 5];
       const periods = Array.from({ length: state.timetableSettings.periodCount }, (_, index) => index + 1);
@@ -6214,6 +6359,7 @@
     }
 
     function exportData() {
+      persistActiveTimetableAliases();
       const payload = {
         app: "Todo Calendar Board",
         storageKey: STORAGE_KEY,
@@ -6340,7 +6486,7 @@
       els.todoWarn.classList.remove("show");
 
       const startDate = normalizeDateString(els.todoDate.value || todayString());
-      const repeatMode = normalizeEventRepeatMode(els.todoRepeatMode.value);
+      const repeatMode = kind === "event" ? normalizeEventRepeatMode(els.todoRepeatMode.value) : "none";
 
       state.todos.push({
         id: makeId("todo"),
@@ -6358,8 +6504,7 @@
         importance: kind === "event" ? "中" : els.todoImportance.value,
         certaintyId: kind === "event" ? (els.todoCertainty.value || "confirmed") : "",
         repeatMode,
-        repeatUntil: repeatMode !== "none" ? normalizeRepeatUntil(els.todoRepeatUntil.value, startDate) : "",
-        doneDates: [],
+        repeatUntil: kind === "event" && repeatMode !== "none" ? normalizeRepeatUntil(els.todoRepeatUntil.value, startDate) : "",
         imageData: pendingTodoImageData,
         done: false
       });
@@ -6513,15 +6658,10 @@
       renderAll();
     }
 
-    function toggleTodo(id, occurrenceDate = "") {
+    function toggleTodo(id) {
       const todo = state.todos.find(item => item.id === id);
-      if (!todo || (todo.kind || "todo") !== "todo") return;
-      if (isRecurringTodo(todo)) {
-        const date = normalizeDateString(occurrenceDate || todo.date);
-        setTodoDoneOnDate(todo, date, !isTodoDoneOnDate(todo, date));
-      } else {
-        todo.done = !todo.done;
-      }
+      if (!todo) return;
+      todo.done = !todo.done;
       renderAll();
     }
 
@@ -6634,8 +6774,8 @@
       els.editStartTimeField.classList.toggle("hidden-field", !isEvent);
       els.editEndTimeField.classList.toggle("hidden-field", !isEvent);
       els.editImportanceField.classList.toggle("hidden-field", isEvent);
-      els.editRepeatFields.classList.remove("hidden-field");
-      els.editRepeatUntilField.classList.toggle("hidden-field", els.editRepeatMode.value === "none");
+      els.editRepeatFields.classList.toggle("hidden-field", !isEvent);
+      els.editRepeatUntilField.classList.toggle("hidden-field", !isEvent || els.editRepeatMode.value === "none");
       if (isEvent) {
         const startDate = els.editDate.value || todayString();
         els.editEndDate.value = normalizeEndDateForStart(startDate, els.editEndDate.value || startDate);
@@ -6673,8 +6813,8 @@
       els.editEndTime.value = todo.endTime || "";
       els.editImportance.value = todo.importance;
       els.editCertainty.value = todo.certaintyId || "confirmed";
-      els.editRepeatMode.value = itemRepeatMode(todo);
-      els.editRepeatUntil.value = itemRepeatMode(todo) !== "none" ? itemRepeatUntil(todo) : "";
+      els.editRepeatMode.value = (todo.kind || "todo") === "event" ? eventRepeatMode(todo) : "none";
+      els.editRepeatUntil.value = (todo.kind || "todo") === "event" ? eventRepeatUntil(todo) : "";
       pendingEditImageData = safeImageSrc(todo.imageData);
       setEditImageData(pendingEditImageData);
       if (els.editImageFile) els.editImageFile.value = "";
@@ -6708,10 +6848,8 @@
       todo.deadlineTime = todo.kind === "event" ? "" : (els.editDeadlineTime.value || "");
       todo.importance = todo.kind === "event" ? "中" : els.editImportance.value;
       todo.certaintyId = todo.kind === "event" ? (els.editCertainty.value || "confirmed") : "";
-      todo.repeatMode = normalizeEventRepeatMode(els.editRepeatMode.value);
-      todo.repeatUntil = todo.repeatMode !== "none" ? normalizeRepeatUntil(els.editRepeatUntil.value, todo.date) : "";
-      todo.doneDates = todo.kind === "todo" ? recurringTodoDoneDates(todo) : [];
-      if (!isRecurringTodo(todo)) todo.doneDates = [];
+      todo.repeatMode = todo.kind === "event" ? normalizeEventRepeatMode(els.editRepeatMode.value) : "none";
+      todo.repeatUntil = todo.kind === "event" && todo.repeatMode !== "none" ? normalizeRepeatUntil(els.editRepeatUntil.value, todo.date) : "";
       todo.imageData = pendingEditImageData;
 
       closeEditModal();
@@ -6793,7 +6931,7 @@
       const parentId = target.dataset.parentId;
       const childId = target.dataset.childId;
 
-      if (action === "toggle") toggleTodo(id, date);
+      if (action === "toggle") toggleTodo(id);
       if (action === "delete") deleteTodo(id);
       if (action === "edit") openEditModal(id);
       if (action === "copy-event") copyEvent(id);
@@ -6881,16 +7019,13 @@
       console.assert(resolveMakeupExtraClass({ sourceClassId: "", title: "補講", room: "別教室", startTime: "10:00", endTime: "11:00" }).room === "別教室", "makeup room override should be kept");
       console.assert(isEventOnDate({ kind: "event", date: "2026-05-01", endDate: "2026-05-01", repeatMode: "weekly" }, "2026-05-15"), "weekly event should repeat");
       console.assert(!isEventOnDate({ kind: "event", date: "2026-05-01", endDate: "2026-05-01", repeatMode: "weekly", repeatUntil: "2026-05-08" }, "2026-05-15"), "weekly event should stop after repeat end date");
-      console.assert(todoOccursOnDate({ kind: "todo", date: "2026-05-01", repeatMode: "weekly" }, "2026-05-15"), "weekly todo should repeat");
-      console.assert(!todoOccursOnDate({ kind: "todo", date: "2026-05-01", repeatMode: "weekly", repeatUntil: "2026-05-08" }, "2026-05-15"), "weekly todo should stop after repeat end date");
-      const recurringTodoTest = { kind: "todo", date: "2026-05-01", repeatMode: "daily", doneDates: [] };
-      setTodoDoneOnDate(recurringTodoTest, "2026-05-02", true);
-      console.assert(isTodoDoneOnDate(recurringTodoTest, "2026-05-02") && !isTodoDoneOnDate(recurringTodoTest, "2026-05-03"), "recurring todo completion should be stored per date");
       console.assert(monthSpanInfoForEntry({ todo: { kind: "event", id: "x", date: "2026-05-01", endDate: "2026-05-03" }, isCarryOver: false }, "2026-05-02").className.includes("middle"), "middle day of multi-day month event should be a connected middle segment");
       console.assert(safeImageSrc("data:image/jpeg;base64,AAAA") !== "", "image data URL should be accepted");
       console.assert(["todo", "calendar"].includes(currentWeekBoardMode()), "week board mode should be valid");
       console.assert(normalizeTimelineSettings({ startHour: 5, endHour: 24 }).startHour === 5, "timeline start hour should normalize");
       console.assert(normalizeTimelineSettings({ startHour: 12, endHour: 9 }).endHour === 13, "timeline end hour should remain after start hour");
+      console.assert(Array.isArray(state.timetables) && state.timetables.length >= 1, "at least one timetable should exist");
+      console.assert(activeTimetable().id === state.activeTimetableId, "active timetable should be resolved");
     }
 
     document.querySelectorAll("[data-view-button]").forEach(button => {
@@ -7099,6 +7234,13 @@
     els.saveClassPresetColor.addEventListener("click", saveClassPresetColorFromSheet);
     els.classColorSheet.addEventListener("click", (event) => {
       if (event.target === els.classColorSheet) closeClassPresetColorSheet();
+    });
+    els.timetableSelect.addEventListener("change", () => switchActiveTimetable(els.timetableSelect.value));
+    els.renameTimetable.addEventListener("click", renameActiveTimetable);
+    els.addTimetable.addEventListener("click", addTimetable);
+    els.deleteTimetable.addEventListener("click", deleteActiveTimetable);
+    els.timetableNameInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") renameActiveTimetable();
     });
     els.saveClass.addEventListener("click", saveClass);
     els.addTodoFromClass.addEventListener("click", addTodoFromSelectedClass);
