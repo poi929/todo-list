@@ -2360,7 +2360,7 @@
     <header class="header">
       <div class="header-top">
         <div>
-          <p class="subtitle">カテゴリと日程で管理するTodoアプリ</p>
+          <p class="subtitle">カテゴリと日程で管理するTodoアプリ v96</p>
           <h1>Todo Calendar Board</h1>
         </div>
 
@@ -3230,8 +3230,8 @@
   </div>
 
   <script>
-    const STORAGE_KEY = "todo-calendar-board-v95";
-    const OLD_KEYS = ["todo-calendar-board-v94", "todo-calendar-board-v93", "todo-calendar-board-v92", "todo-calendar-board-v91", "todo-calendar-board-v90", "todo-calendar-board-v89", "todo-calendar-board-v88", "todo-calendar-board-v87", "todo-calendar-board-v86", "todo-calendar-board-v85", "todo-calendar-board-v84", "todo-calendar-board-v83", "todo-calendar-board-v82", "todo-calendar-board-v81", "todo-calendar-board-v80", "todo-calendar-board-v79", "todo-calendar-board-v78", "todo-calendar-board-v77", "todo-calendar-board-v76", "todo-calendar-board-v75", "todo-calendar-board-v74", "todo-calendar-board-v73", "todo-calendar-board-v72", "todo-calendar-board-v71", "todo-calendar-board-v70", "todo-calendar-board-v69", "todo-calendar-board-v68", "todo-calendar-board-v67", "todo-calendar-board-v66", "todo-calendar-board-v65", "todo-calendar-board-v64", "todo-calendar-board-v63", "todo-calendar-board-v62", "todo-calendar-board-v61", "todo-calendar-board-v60", "todo-calendar-board-v59", "todo-calendar-board-v58", "todo-calendar-board-v57", "todo-calendar-board-v56", "todo-calendar-board-v55", "todo-calendar-board-v54", "todo-calendar-board-v53", "todo-calendar-board-v52", "todo-calendar-board-v51", "todo-calendar-board-v50", "todo-calendar-board-v49", "todo-calendar-board-v48", "todo-calendar-board-v47", "todo-calendar-board-v46", "todo-calendar-board-v45", "todo-calendar-board-v44", "todo-calendar-board-v43", "todo-calendar-board-v42", "todo-calendar-board-v41", "todo-calendar-board-v40", "todo-calendar-board-v39", "todo-calendar-board-v38", "todo-calendar-board-v37", "todo-calendar-board-v36", "todo-calendar-board-v35", "todo-calendar-board-v34", "todo-calendar-board-v33", "todo-calendar-board-v32", "todo-calendar-board-v31", "todo-calendar-board-v30", "todo-calendar-board-v29", "todo-calendar-board-v28", "todo-calendar-board-v27", "todo-calendar-board-v26", "todo-calendar-board-v25", "todo-calendar-board-v24", "todo-calendar-board-v23", "todo-calendar-board-v22", "todo-calendar-board-v21", "todo-calendar-board-v20", "todo-calendar-board-v19", "todo-calendar-board-v18", "todo-calendar-board-v17", "todo-calendar-board-v16", "todo-calendar-board-v15", "todo-calendar-board-v14", "todo-calendar-board-v13", "todo-calendar-board-v12", "todo-calendar-board-v11", "todo-calendar-board-v10", "todo-calendar-board-v9", "todo-calendar-board-v8", "todo-calendar-board-v7", "todo-calendar-board-v6", "todo-calendar-board-v5", "todo-calendar-board-v4", "todo-calendar-board-v3", "todo-calendar-board-v2", "todo-calendar-board-v1"];
+    const STORAGE_KEY = "todo-calendar-board-v96";
+    const OLD_KEYS = ["todo-calendar-board-v95", "todo-calendar-board-v94", "todo-calendar-board-v93", "todo-calendar-board-v92", "todo-calendar-board-v91", "todo-calendar-board-v90", "todo-calendar-board-v89", "todo-calendar-board-v88", "todo-calendar-board-v87", "todo-calendar-board-v86", "todo-calendar-board-v85", "todo-calendar-board-v84", "todo-calendar-board-v83", "todo-calendar-board-v82", "todo-calendar-board-v81", "todo-calendar-board-v80", "todo-calendar-board-v79", "todo-calendar-board-v78", "todo-calendar-board-v77", "todo-calendar-board-v76", "todo-calendar-board-v75", "todo-calendar-board-v74", "todo-calendar-board-v73", "todo-calendar-board-v72", "todo-calendar-board-v71", "todo-calendar-board-v70", "todo-calendar-board-v69", "todo-calendar-board-v68", "todo-calendar-board-v67", "todo-calendar-board-v66", "todo-calendar-board-v65", "todo-calendar-board-v64", "todo-calendar-board-v63", "todo-calendar-board-v62", "todo-calendar-board-v61", "todo-calendar-board-v60", "todo-calendar-board-v59", "todo-calendar-board-v58", "todo-calendar-board-v57", "todo-calendar-board-v56", "todo-calendar-board-v55", "todo-calendar-board-v54", "todo-calendar-board-v53", "todo-calendar-board-v52", "todo-calendar-board-v51", "todo-calendar-board-v50", "todo-calendar-board-v49", "todo-calendar-board-v48", "todo-calendar-board-v47", "todo-calendar-board-v46", "todo-calendar-board-v45", "todo-calendar-board-v44", "todo-calendar-board-v43", "todo-calendar-board-v42", "todo-calendar-board-v41", "todo-calendar-board-v40", "todo-calendar-board-v39", "todo-calendar-board-v38", "todo-calendar-board-v37", "todo-calendar-board-v36", "todo-calendar-board-v35", "todo-calendar-board-v34", "todo-calendar-board-v33", "todo-calendar-board-v32", "todo-calendar-board-v31", "todo-calendar-board-v30", "todo-calendar-board-v29", "todo-calendar-board-v28", "todo-calendar-board-v27", "todo-calendar-board-v26", "todo-calendar-board-v25", "todo-calendar-board-v24", "todo-calendar-board-v23", "todo-calendar-board-v22", "todo-calendar-board-v21", "todo-calendar-board-v20", "todo-calendar-board-v19", "todo-calendar-board-v18", "todo-calendar-board-v17", "todo-calendar-board-v16", "todo-calendar-board-v15", "todo-calendar-board-v14", "todo-calendar-board-v13", "todo-calendar-board-v12", "todo-calendar-board-v11", "todo-calendar-board-v10", "todo-calendar-board-v9", "todo-calendar-board-v8", "todo-calendar-board-v7", "todo-calendar-board-v6", "todo-calendar-board-v5", "todo-calendar-board-v4", "todo-calendar-board-v3", "todo-calendar-board-v2", "todo-calendar-board-v1"];
 
     const initialState = {
       parents: [
@@ -3942,6 +3942,7 @@
       syncActiveTimetableAliases();
       clearClassEditor();
       closeClassEditor();
+      saveState();
       renderAll();
     }
 
@@ -3984,6 +3985,7 @@
       syncActiveTimetableAliases();
       clearClassEditor();
       closeClassEditor();
+      saveState();
       renderAll();
     }
 
@@ -3992,6 +3994,7 @@
       const name = normalizeTimetableName(els.timetableNameInput.value, active.name || "時間割");
       active.name = name;
       if (els.timetableNameInput) els.timetableNameInput.value = name;
+      saveState();
       renderAll();
     }
 
@@ -4008,6 +4011,7 @@
       syncActiveTimetableAliases();
       clearClassEditor();
       closeClassEditor();
+      saveState();
       renderAll();
     }
 
@@ -4729,12 +4733,63 @@
       }
     }
 
+    function isQuotaExceededError(error) {
+      return Boolean(error) && (
+        error.name === "QuotaExceededError" ||
+        error.name === "NS_ERROR_DOM_QUOTA_REACHED" ||
+        error.code === 22 ||
+        error.code === 1014
+      );
+    }
+
+    function removeOldStorageKeys() {
+      const keysToRemove = new Set(OLD_KEYS);
+      try {
+        for (let i = localStorage.length - 1; i >= 0; i -= 1) {
+          const key = localStorage.key(i);
+          if (/^todo-calendar-board-v\d+$/.test(String(key)) && key !== STORAGE_KEY) {
+            keysToRemove.add(key);
+          }
+        }
+      } catch {}
+
+      keysToRemove.forEach(key => {
+        if (key === STORAGE_KEY) return;
+        try {
+          localStorage.removeItem(key);
+        } catch {}
+      });
+    }
+
+    function notifySaveFailure(error) {
+      console.warn("保存に失敗しました。", error);
+      window.__todoSaveFailure = error;
+      if (!window.__todoSaveFailureNotified) {
+        window.__todoSaveFailureNotified = true;
+        alert("保存に失敗しました。ブラウザの保存容量不足、または古いPWAキャッシュが原因の可能性があります。\nこのまま閉じると、直前の変更が残らない場合があります。");
+      }
+    }
+
     function saveState() {
       try {
         persistActiveTimetableAliases();
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        const serialized = JSON.stringify(state);
+
+        try {
+          localStorage.setItem(STORAGE_KEY, serialized);
+          removeOldStorageKeys();
+          window.__todoSaveFailure = null;
+          return true;
+        } catch (error) {
+          if (!isQuotaExceededError(error)) throw error;
+          removeOldStorageKeys();
+          localStorage.setItem(STORAGE_KEY, serialized);
+          window.__todoSaveFailure = null;
+          return true;
+        }
       } catch (error) {
-        console.warn("保存に失敗しました。", error);
+        notifySaveFailure(error);
+        return false;
       }
     }
 
@@ -6464,7 +6519,7 @@
     function exportData() {
       persistActiveTimetableAliases();
       const payload = {
-        app: "Todo Calendar Board",
+        app: "Todo Calendar Board v96",
         storageKey: STORAGE_KEY,
         exportedAt: new Date().toISOString(),
         state
