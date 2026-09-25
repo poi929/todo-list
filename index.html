@@ -2350,7 +2350,7 @@
     }
 
     /* =====================================================================
-       v99 デザインレイヤー
+       v100 デザインレイヤー
        既存のCSSの後ろに置き、同じ詳細度のルールを上書きする。
        インラインで指定される色（重要度・確定度・授業の色）はユーザー設定なので、
        色そのものは変えず、線の太さや配置だけを調整する。
@@ -4318,7 +4318,7 @@
           <span class="brand-mark"><svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 9.5h16M8.5 3v3.5M15.5 3v3.5"/><path d="m9 14.5 2 2 4-4.2"/></svg></span>
           <div class="brand-text">
             <h1>Todo Calendar Board</h1>
-            <span class="version-badge" title="バージョン">v99</span>
+            <span class="version-badge" title="バージョン">v100</span>
           </div>
         </div>
 
@@ -6754,7 +6754,12 @@
       }
     }
 
+    // 描画済み週表の識別子。保存対象stateには追加しない。
+    let lastWeekRenderToken = "";
+
     function saveState() {
+      // Todo・予定・時間割の保存後は、次回の週表参照で古いDOMを再利用しない。
+      lastWeekRenderToken = "";
       try {
         persistActiveTimetableAliases();
         const serialized = JSON.stringify(state);
@@ -7000,9 +7005,9 @@
       return base.sort((a, b) => importanceRank(b.todo.importance) - importanceRank(a.todo.importance));
     }
 
-    function weekImportanceCounts(dateString) {
+    function weekImportanceCounts(dateString, precomputedEntries = null) {
       const counts = { "高": 0, "中": 0, "低": 0 };
-      effectiveTodosForDate(dateString).forEach(entry => {
+      (precomputedEntries || effectiveTodosForDate(dateString)).forEach(entry => {
         const todo = entry.todo;
         if ((todo.kind || "todo") === "event" || todo.done) return;
         const level = entry.isCarryOver ? "高" : (["高", "中", "低"].includes(todo.importance) ? todo.importance : "中");
@@ -7011,8 +7016,8 @@
       return counts;
     }
 
-    function weekImportanceCountsHtml(dateString) {
-      const counts = weekImportanceCounts(dateString);
+    function weekImportanceCountsHtml(dateString, precomputedEntries = null) {
+      const counts = weekImportanceCounts(dateString, precomputedEntries);
       return `<div class="week-count-row">${["高", "中", "低"].map(level =>
         `<span class="week-count-pill" style="background:${importanceColor(level)}">${level}:${counts[level]}</span>`
       ).join("")}</div>`;
@@ -7324,13 +7329,30 @@
     function renderMatrix() {
       const mode = currentWeekBoardMode();
       const startDate = mode === "calendar" ? currentWeekScheduleStart() : todayString();
+      // 画面タブに戻るだけなら、前回描画済みの週表DOMをそのまま使う。
+      // 週表モード、期間、並び順、日付変更時は再描画。データ変更はsaveStateで無効化。
+      const weekRenderToken = [mode, startDate, state.weekSortMode, todayString()].join("|");
+      if (lastWeekRenderToken === weekRenderToken && els.matrixTable.childElementCount > 0) return;
       const dates = getDateRange(startDate, 7);
       updateWeekBoardControls();
       if (mode === "calendar") {
         renderWeekSchedule(dates);
+        lastWeekRenderToken = weekRenderToken;
         return;
       }
       const categories = weekCategories();
+      // 日×カテゴリごとにtodos全件を走査しない。7日分を各1回走査して事前に分類する。
+      const entriesByDay = new Map(dates.map(date => [date, effectiveTodosForDate(date)]));
+      const entriesByDayAndChild = new Map(dates.map(date => {
+        const byChild = new Map();
+        for (const entry of entriesByDay.get(date)) {
+          if (entry.todo.kind === "event") continue;
+          const childId = entry.todo.childId;
+          if (!byChild.has(childId)) byChild.set(childId, []);
+          byChild.get(childId).push(entry);
+        }
+        return [date, byChild];
+      }));
       els.weekSortMode.value = state.weekSortMode;
 
       const header = `
@@ -7341,7 +7363,7 @@
               return `<th class="date-head ${date === todayString() ? "today" : ""}">
                 <div class="week-date-wrap">
                   <div>${escapeHtml(weekDateLabel(date)).replace("\n", "<br>")}</div>
-                  ${weekImportanceCountsHtml(date)}
+                  ${weekImportanceCountsHtml(date, entriesByDay.get(date))}
                 </div>
               </th>`;
             }).join("")}
@@ -7366,8 +7388,7 @@
         lastParentId = category.parentId;
 
         const cells = dates.map(date => {
-          const cellTodos = effectiveTodosForDate(date)
-            .filter(entry => entry.todo.kind !== "event" && entry.todo.childId === category.childId);
+          const cellTodos = entriesByDayAndChild.get(date).get(category.childId) || [];
 
           return `
             <td>
@@ -7406,6 +7427,7 @@
       }).join("");
 
       els.matrixTable.innerHTML = `<table>${header}<tbody>${body}</tbody></table>`;
+      lastWeekRenderToken = weekRenderToken;
     }
 
     function miniTodoHtml(todo, isCarryOver) {
@@ -8504,7 +8526,7 @@
     function exportData() {
       persistActiveTimetableAliases();
       const payload = {
-        app: "Todo Calendar Board v99",
+        app: "Todo Calendar Board v100",
         storageKey: STORAGE_KEY,
         exportedAt: new Date().toISOString(),
         state
