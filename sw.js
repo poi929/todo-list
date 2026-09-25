@@ -1,10 +1,8 @@
-const CACHE_NAME = "todo-calendar-board-v98";
+const CACHE_NAME = "todo-calendar-board-v99";
 const ASSETS = [
   "./",
   "./index.html",
-  "./manifest.webmanifest",
-  "./icon-192.png",
-  "./icon-512.png"
+  "./manifest.webmanifest"
 ];
 
 self.addEventListener("install", event => {

@@ -2350,7 +2350,7 @@
     }
 
     /* =====================================================================
-       v98 デザインレイヤー
+       v99 デザインレイヤー
        既存のCSSの後ろに置き、同じ詳細度のルールを上書きする。
        インラインで指定される色（重要度・確定度・授業の色）はユーザー設定なので、
        色そのものは変えず、線の太さや配置だけを調整する。
@@ -4318,7 +4318,7 @@
           <span class="brand-mark"><svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 9.5h16M8.5 3v3.5M15.5 3v3.5"/><path d="m9 14.5 2 2 4-4.2"/></svg></span>
           <div class="brand-text">
             <h1>Todo Calendar Board</h1>
-            <span class="version-badge" title="バージョン">v98</span>
+            <span class="version-badge" title="バージョン">v99</span>
           </div>
         </div>
 
@@ -5193,6 +5193,8 @@
 
   <script>
     const STORAGE_KEY = "todo-calendar-board-v96";
+    // v98と同じデータキー。画面移動だけは巨大なデータを書き直さず別の小さいキーへ保存する。
+    const NAV_STORAGE_KEY = "todo-calendar-board-v99-navigation";
     const OLD_KEYS = ["todo-calendar-board-v95", "todo-calendar-board-v94", "todo-calendar-board-v93", "todo-calendar-board-v92", "todo-calendar-board-v91", "todo-calendar-board-v90", "todo-calendar-board-v89", "todo-calendar-board-v88", "todo-calendar-board-v87", "todo-calendar-board-v86", "todo-calendar-board-v85", "todo-calendar-board-v84", "todo-calendar-board-v83", "todo-calendar-board-v82", "todo-calendar-board-v81", "todo-calendar-board-v80", "todo-calendar-board-v79", "todo-calendar-board-v78", "todo-calendar-board-v77", "todo-calendar-board-v76", "todo-calendar-board-v75", "todo-calendar-board-v74", "todo-calendar-board-v73", "todo-calendar-board-v72", "todo-calendar-board-v71", "todo-calendar-board-v70", "todo-calendar-board-v69", "todo-calendar-board-v68", "todo-calendar-board-v67", "todo-calendar-board-v66", "todo-calendar-board-v65", "todo-calendar-board-v64", "todo-calendar-board-v63", "todo-calendar-board-v62", "todo-calendar-board-v61", "todo-calendar-board-v60", "todo-calendar-board-v59", "todo-calendar-board-v58", "todo-calendar-board-v57", "todo-calendar-board-v56", "todo-calendar-board-v55", "todo-calendar-board-v54", "todo-calendar-board-v53", "todo-calendar-board-v52", "todo-calendar-board-v51", "todo-calendar-board-v50", "todo-calendar-board-v49", "todo-calendar-board-v48", "todo-calendar-board-v47", "todo-calendar-board-v46", "todo-calendar-board-v45", "todo-calendar-board-v44", "todo-calendar-board-v43", "todo-calendar-board-v42", "todo-calendar-board-v41", "todo-calendar-board-v40", "todo-calendar-board-v39", "todo-calendar-board-v38", "todo-calendar-board-v37", "todo-calendar-board-v36", "todo-calendar-board-v35", "todo-calendar-board-v34", "todo-calendar-board-v33", "todo-calendar-board-v32", "todo-calendar-board-v31", "todo-calendar-board-v30", "todo-calendar-board-v29", "todo-calendar-board-v28", "todo-calendar-board-v27", "todo-calendar-board-v26", "todo-calendar-board-v25", "todo-calendar-board-v24", "todo-calendar-board-v23", "todo-calendar-board-v22", "todo-calendar-board-v21", "todo-calendar-board-v20", "todo-calendar-board-v19", "todo-calendar-board-v18", "todo-calendar-board-v17", "todo-calendar-board-v16", "todo-calendar-board-v15", "todo-calendar-board-v14", "todo-calendar-board-v13", "todo-calendar-board-v12", "todo-calendar-board-v11", "todo-calendar-board-v10", "todo-calendar-board-v9", "todo-calendar-board-v8", "todo-calendar-board-v7", "todo-calendar-board-v6", "todo-calendar-board-v5", "todo-calendar-board-v4", "todo-calendar-board-v3", "todo-calendar-board-v2", "todo-calendar-board-v1"];
 
     const initialState = {
@@ -6690,6 +6692,25 @@
         loaded.categorySearchQuery = loaded.categorySearchQuery || "";
         loaded.monthCursor = loaded.monthCursor || todayString();
         loaded.lastKnownToday = loaded.lastKnownToday || todayString();
+        // 画面移動だけで既存のTodo/予定/時間割を再保存しないための軽量UI状態。
+        // v96の保存データ形式はそのままなので、古いバージョンに戻しても本体データは読める。
+        try {
+          const navigation = JSON.parse(localStorage.getItem(NAV_STORAGE_KEY) || "null");
+          if (navigation && typeof navigation === "object") {
+            const validViews = ["matrix", "month", "day", "category", "completed", "add", "manage", "settings", "timetable", "data"];
+            if (validViews.includes(navigation.view)) loaded.view = navigation.view;
+            for (const key of ["selectedDate", "monthCursor", "weekScheduleCursor"]) {
+              if (isValidDateString(navigation[key])) loaded[key] = navigation[key];
+            }
+            if (["todo", "calendar"].includes(navigation.weekBoardMode)) loaded.weekBoardMode = navigation.weekBoardMode;
+            if (["manual", "parent"].includes(navigation.weekSortMode)) loaded.weekSortMode = navigation.weekSortMode;
+            for (const key of ["filterParentId", "filterChildId", "filterKind", "selectedParentId", "categorySearchQuery"]) {
+              if (typeof navigation[key] === "string") loaded[key] = navigation[key];
+            }
+          }
+        } catch (error) {
+          console.warn("画面位置の復元を省略しました。", error);
+        }
         return loaded;
       } catch {
         return createLoadedInitialState();
@@ -8447,10 +8468,8 @@
     }
 
     function goFromGear(view) {
-      state.view = view;
       closeGearMenu();
-      renderAll();
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      navigateFast(view);
     }
 
     function goFromFab(view, kind) {
@@ -8466,12 +8485,11 @@
         els.todoDate.value = dateForNewItem;
       }
       closeFabMenu();
-      renderAll();
+      navigateFast(view);
       if (view === "add" && dateForNewItem) {
         els.todoDate.value = dateForNewItem;
         if (kind === "event") els.todoEndDate.value = dateForNewItem;
       }
-      window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
 
@@ -8486,7 +8504,7 @@
     function exportData() {
       persistActiveTimetableAliases();
       const payload = {
-        app: "Todo Calendar Board v98",
+        app: "Todo Calendar Board v99",
         storageKey: STORAGE_KEY,
         exportedAt: new Date().toISOString(),
         state
@@ -8536,6 +8554,7 @@
         }
 
         localStorage.setItem(STORAGE_KEY, JSON.stringify(importedState));
+        localStorage.removeItem(NAV_STORAGE_KEY);
         state = loadState();
         saveState();
         renderAll();
@@ -8576,9 +8595,60 @@
       }
     }
 
+    function saveNavigationState() {
+      // UIの位置情報だけを保存。画像付きTodo等をJSON化するsaveState()は画面移動から呼ばない。
+      try {
+        const navigation = {};
+        for (const key of [
+          "view", "selectedDate", "monthCursor", "weekScheduleCursor", "weekBoardMode", "weekSortMode",
+          "filterParentId", "filterChildId", "filterKind", "selectedParentId", "categorySearchQuery"
+        ]) navigation[key] = state[key];
+        localStorage.setItem(NAV_STORAGE_KEY, JSON.stringify(navigation));
+      } catch (error) {
+        // 画面の切り替え自体は、閲覧位置の保存に失敗しても継続する。
+        console.warn("画面位置を保存できませんでした。", error);
+      }
+    }
+
+    function renderCurrentView() {
+      // HTML本体のイベント委譲を維持しながら、現在の画面に必要な処理だけ行う。
+      switch (state.view) {
+        case "matrix": safeRenderPart("週カレンダー", renderMatrix); break;
+        case "month": safeRenderPart("月カレンダー", renderMonth); break;
+        case "day": safeRenderPart("日別", renderDay); break;
+        case "category":
+          safeRenderPart("選択肢", renderSelects);
+          safeRenderPart("カテゴリ別", renderCategory);
+          break;
+        case "completed": safeRenderPart("完了済み", renderCompleted); break;
+        case "timetable": safeRenderPart("時間割", renderTimetable); break;
+        case "manage":
+          safeRenderPart("選択肢", renderSelects);
+          safeRenderPart("カテゴリ管理", renderCategories);
+          break;
+        case "settings": safeRenderPart("表示設定", renderSettings); break;
+        case "add":
+          safeRenderPart("選択肢", renderSelects);
+          safeRenderPart("追加フォーム", updateTodoFormVisibility);
+          break;
+        case "data": break;
+      }
+    }
+
+    function navigateFast(view = state.view) {
+      state.view = view;
+      normalizeDateChange();
+      saveNavigationState();
+      renderViews();
+      renderCurrentView();
+      // smooth scrollによる見かけ上の遅延を避ける。
+      window.scrollTo({ top: 0, behavior: "instant" });
+    }
+
     function renderAll() {
       normalizeDateChange();
       saveState();
+      saveNavigationState();
       renderViews();
       safeRenderPart("選択肢", renderSelects);
       safeRenderPart("追加フォーム", updateTodoFormVisibility);
@@ -9076,30 +9146,22 @@
       if (action === "copy-event") copyEvent(id);
       if (action === "select-day" && date) {
         state.selectedDate = date;
-        state.view = "day";
-        renderAll();
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        navigateFast("day");
       }
       if (action === "edit-class" && id) {
-        state.view = "timetable";
-        renderAll();
+        navigateFast("timetable");
         openClassEditor(id);
-        window.scrollTo({ top: 0, behavior: "smooth" });
       }
       if (action === "edit-class-slot" && day && period) {
-        state.view = "timetable";
-        renderAll();
+        navigateFast("timetable");
         openClassSlot(Number(day), Number(period));
-        window.scrollTo({ top: 0, behavior: "smooth" });
       }
       if (action === "open-class-inline" && id) {
         openClassEditor(id);
       }
       if (action === "open-timetable" && id) {
-        state.view = "timetable";
-        renderAll();
+        navigateFast("timetable");
         openClassEditor(id);
-        window.scrollTo({ top: 0, behavior: "smooth" });
       }
       if (action === "edit-parent-category" && parentId) {
         editParentCategory(parentId);
@@ -9116,8 +9178,7 @@
       if (action === "open-day-override") {
         if (date && date !== state.selectedDate) {
           state.selectedDate = date;
-          state.view = "day";
-          renderAll();
+          navigateFast("day");
         }
         openDayOverrideModal();
       }
@@ -9172,9 +9233,7 @@
         state.view = button.dataset.viewButton;
         closeFabMenu();
         closeGearMenu();
-        renderViews();
-        renderAll();
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        navigateFast(state.view);
       });
     });
 
@@ -9253,98 +9312,98 @@
 
     els.categoryParent.addEventListener("change", () => {
       state.selectedParentId = els.categoryParent.value;
-      renderAll();
+      navigateFast();
     });
 
     els.filterParent.addEventListener("change", () => {
       state.filterParentId = els.filterParent.value;
       state.filterChildId = "all";
-      renderAll();
+      navigateFast();
     });
 
     els.filterChild.addEventListener("change", () => {
       state.filterChildId = els.filterChild.value;
-      renderAll();
+      navigateFast();
     });
 
     els.filterKind.addEventListener("change", () => {
       state.filterKind = els.filterKind.value;
-      renderAll();
+      navigateFast();
     });
 
     els.categorySearch.addEventListener("input", () => {
       state.categorySearchQuery = els.categorySearch.value;
-      saveState();
+      saveNavigationState();
       safeRenderPart("カテゴリ別", renderCategory);
     });
 
     els.weekBoardModeButtons.forEach(button => {
       button.addEventListener("click", () => {
         state.weekBoardMode = button.dataset.weekBoardMode === "calendar" ? "calendar" : "todo";
-        renderAll();
+        navigateFast();
       });
     });
 
     els.prevWeekSchedule.addEventListener("click", () => {
       state.weekScheduleCursor = dateOffset(currentWeekScheduleStart(), -1);
-      renderAll();
+      navigateFast();
     });
 
     els.nextWeekSchedule.addEventListener("click", () => {
       state.weekScheduleCursor = dateOffset(currentWeekScheduleStart(), 1);
-      renderAll();
+      navigateFast();
     });
 
     els.thisWeekSchedule.addEventListener("click", () => {
       state.weekScheduleCursor = todayString();
-      renderAll();
+      navigateFast();
     });
 
     els.weekScheduleStartDate.addEventListener("change", () => {
       state.weekScheduleCursor = normalizeDateString(els.weekScheduleStartDate.value, todayString());
-      renderAll();
+      navigateFast();
     });
 
     els.weekSortMode.addEventListener("change", () => {
       state.weekSortMode = els.weekSortMode.value;
-      renderAll();
+      navigateFast();
     });
 
     els.resetWeekOrder.addEventListener("click", resetWeekOrder);
 
     els.selectedDate.addEventListener("change", () => {
       state.selectedDate = els.selectedDate.value;
-      renderAll();
+      navigateFast();
     });
 
     els.prevDay.addEventListener("click", () => {
       state.selectedDate = dateOffset(state.selectedDate || todayString(), -1);
-      renderAll();
+      navigateFast();
     });
 
     els.nextDay.addEventListener("click", () => {
       state.selectedDate = dateOffset(state.selectedDate || todayString(), 1);
-      renderAll();
+      navigateFast();
     });
 
     els.todayDay.addEventListener("click", () => {
       state.selectedDate = todayString();
-      renderAll();
+      navigateFast();
     });
 
     els.prevMonth.addEventListener("click", () => {
       state.monthCursor = addMonths(state.monthCursor, -1);
-      renderAll();
+      navigateFast();
     });
 
     els.nextMonth.addEventListener("click", () => {
       state.monthCursor = addMonths(state.monthCursor, 1);
-      renderAll();
+      navigateFast();
     });
 
     els.thisMonth.addEventListener("click", () => {
       state.monthCursor = todayString();
-      renderAll();
+      navigateFast();
     });
 
     els.addTodo.addEventListener("click", addTodo);
@@ -9353,9 +9412,7 @@
       cancelAddTodoButton.addEventListener("click", () => {
         els.todoWarn.classList.remove("show");
         const returnableViews = ["matrix", "month", "day", "category", "completed", "timetable", "manage", "settings", "data"];
-        state.view = returnableViews.includes(addReturnView) ? addReturnView : "matrix";
-        renderAll();
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        navigateFast(returnableViews.includes(addReturnView) ? addReturnView : "matrix");
       });
     }
 
