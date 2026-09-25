@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light" />
   <title>Todo Calendar Board</title>
   <style>
     :root {
@@ -659,23 +660,23 @@
       color: var(--muted);
     }
 
-    .selected {
+    div.selected {
       background: var(--soft);
       border-radius: 16px;
       padding: 14px;
       margin-bottom: 16px;
     }
 
-    .selected p {
+    div.selected p {
       margin: 0;
     }
 
-    .selected .small {
+    div.selected .small {
       color: var(--muted);
       font-size: 13px;
     }
 
-    .selected .large {
+    div.selected .large {
       font-size: 18px;
       font-weight: 800;
       word-break: break-word;
@@ -2347,6 +2348,1960 @@
         font-size: 10px;
       }
     }
+
+    /* =====================================================================
+       v98 デザインレイヤー
+       既存のCSSの後ろに置き、同じ詳細度のルールを上書きする。
+       インラインで指定される色（重要度・確定度・授業の色）はユーザー設定なので、
+       色そのものは変えず、線の太さや配置だけを調整する。
+       JSが位置計算に使う寸法（時間軸の1時間あたりの高さ）は変更しない。
+       ===================================================================== */
+
+    :root {
+      color-scheme: light;
+      accent-color: #4f46e5;
+
+      --bg: #f4f5f7;
+      --card: #ffffff;
+      --text: #111827;
+      --text-2: #374151;
+      --muted: #6b7280;
+      --faint: #9ca3af;
+      --line: #e5e7eb;
+      --line2: #d1d5db;
+      --hair: #eef0f3;
+      --soft: #f3f4f6;
+
+      --accent: #4f46e5;
+      --accent-hover: #4338ca;
+      --accent-soft: #eef2ff;
+      --accent-line: #c7d2fe;
+      --dark: #4f46e5;
+      --today-soft: #eef2ff;
+      --today-line: #c7d2fe;
+
+      --danger: #dc2626;
+      --danger-soft: #fef2f2;
+      --danger-line: #fecaca;
+
+      --focus-ring: rgba(79, 70, 229, 0.25);
+      --shadow-sm: 0 1px 2px rgba(17, 24, 39, 0.05);
+      --shadow-md: 0 4px 16px rgba(17, 24, 39, 0.08);
+      --shadow-lg: 0 24px 56px rgba(17, 24, 39, 0.2);
+      --nav-h: 62px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Meiryo", "Noto Sans JP", "Noto Sans CJK JP", system-ui, "Segoe UI", sans-serif;
+      font-size: 15px;
+      -webkit-font-smoothing: antialiased;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    button {
+      touch-action: manipulation;
+    }
+
+    .icon {
+      flex: 0 0 auto;
+      display: block;
+    }
+
+    .visually-hidden {
+      position: absolute !important;
+      width: 1px;
+      height: 1px;
+      margin: -1px;
+      padding: 0;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    :where(button, a, summary, [data-action], input[type="checkbox"], input[type="color"], input[type="file"]):focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    h1, h2, h3 {
+      color: var(--text);
+    }
+
+    h2 {
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    .desc {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    /* =====================================================================
+       レイアウト（スマホ基準：上部バー＋下部タブバー）
+       ===================================================================== */
+    .app {
+      max-width: 1200px;
+      padding: 0 16px calc(var(--nav-h) + 100px + env(safe-area-inset-bottom, 0px));
+    }
+
+    .header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      width: auto;
+      margin: 0 -16px 14px;
+      padding: calc(10px + env(safe-area-inset-top, 0px)) 16px 10px;
+      border: 0;
+      border-bottom: 1px solid var(--line);
+      border-radius: 0;
+      background: rgba(244, 245, 247, 0.96);
+      box-shadow: none;
+      /* backdrop-filter は固定配置のタブバーの基準を変えてしまうため使わない */
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+
+    .header-top {
+      align-items: center;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 9px;
+      background: linear-gradient(145deg, #6366f1, #4338ca);
+      color: white;
+      box-shadow: 0 2px 6px rgba(79, 70, 229, 0.35);
+      flex: 0 0 auto;
+    }
+
+    .brand-mark .icon {
+      width: 19px;
+      height: 19px;
+    }
+
+    .brand-text {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .version-badge {
+      display: inline-block;
+      padding: 0 6px;
+      border-radius: 6px;
+      background: #e8eaee;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 600;
+      line-height: 18px;
+      flex: 0 0 auto;
+    }
+
+    /* 下部タブバー */
+    .tabs {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 30;
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 0;
+      margin: 0;
+      padding: 5px 6px calc(5px + env(safe-area-inset-bottom, 0px));
+      border: 0;
+      border-top: 1px solid var(--line);
+      border-radius: 0;
+      background: rgba(255, 255, 255, 0.94);
+      backdrop-filter: saturate(180%) blur(16px);
+      -webkit-backdrop-filter: saturate(180%) blur(16px);
+    }
+
+    .tab {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      min-width: 0;
+      min-height: 50px;
+      padding: 5px 2px;
+      border: 0;
+      border-radius: 10px;
+      background: transparent;
+      color: var(--faint);
+      font-size: 11px;
+      font-weight: 600;
+      box-shadow: none;
+      transition: color 0.15s ease, background 0.15s ease;
+    }
+
+    .tab .icon {
+      width: 23px;
+      height: 23px;
+    }
+
+    .tab:hover {
+      background: transparent;
+      color: var(--text-2);
+    }
+
+    .tab.active {
+      background: transparent;
+      color: var(--accent);
+      box-shadow: none;
+    }
+
+    .tab.active .icon {
+      stroke-width: 2.1;
+    }
+
+    /* 設定メニュー */
+    .gear-button {
+      display: grid;
+      place-items: center;
+      width: 38px;
+      height: 38px;
+      border: 0;
+      border-radius: 10px;
+      background: transparent;
+      color: var(--text-2);
+      box-shadow: none;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+
+    .gear-button:hover {
+      background: #e8eaee;
+    }
+
+    .gear-button.active {
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+
+    .gear-menu {
+      top: 44px;
+      width: 210px;
+      padding: 6px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: var(--shadow-lg);
+    }
+
+    .gear-item,
+    .fab-item {
+      background: transparent;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      color: var(--text-2);
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .gear-item .icon,
+    .fab-item .icon {
+      width: 19px;
+      height: 19px;
+      color: var(--muted);
+    }
+
+    .gear-item:hover,
+    .fab-item:hover {
+      background: var(--soft);
+      color: var(--text);
+    }
+
+    .gear-item.active {
+      background: var(--accent-soft);
+      color: var(--accent);
+      box-shadow: none;
+    }
+
+    .gear-item.active .icon {
+      color: var(--accent);
+    }
+
+    /* 追加ボタン */
+    .fab-wrap {
+      right: 18px;
+      bottom: calc(var(--nav-h) + 16px + env(safe-area-inset-bottom, 0px));
+    }
+
+    .fab {
+      width: 56px;
+      height: 56px;
+      background: var(--accent);
+      box-shadow: 0 10px 24px rgba(79, 70, 229, 0.35), 0 2px 6px rgba(17, 24, 39, 0.12);
+    }
+
+    .fab .icon {
+      width: 26px;
+      height: 26px;
+      stroke-width: 2.2;
+    }
+
+    .fab:not(.open):hover {
+      background: var(--accent-hover);
+    }
+
+    .fab.open {
+      background: #374151;
+    }
+
+    .fab-menu {
+      bottom: 68px;
+      width: 190px;
+      padding: 6px;
+      border-radius: 14px;
+      box-shadow: var(--shadow-lg);
+    }
+
+    /* =====================================================================
+       画面の骨格
+       ===================================================================== */
+    .main-view.card {
+      margin: 0;
+      padding: 2px 0 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    /* 主要タブの画面では、操作説明の文章を省いて見出しだけにする */
+    .main-view.card > .view-head .desc,
+    #openFabHint {
+      display: none;
+    }
+
+    .view-head {
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .view-head h2,
+    .section-title h2 {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--card);
+      box-shadow: var(--shadow-sm);
+      padding: 18px;
+    }
+
+    .form-card {
+      max-width: 580px;
+    }
+
+    .section-title {
+      margin-bottom: 16px;
+    }
+
+    .block-title,
+    .all-day-box h3 {
+      margin: 0 0 8px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    .empty {
+      padding: 28px 16px;
+      border: 1px dashed var(--line2);
+      border-radius: 12px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .warn {
+      border-radius: 10px;
+    }
+
+    /* =====================================================================
+       ボタン
+       ===================================================================== */
+    .primary,
+    .secondary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      min-height: 40px;
+      padding: 8px 14px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 1.2;
+      transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.08s ease;
+    }
+
+    .primary {
+      border: 0;
+      background: var(--accent);
+      color: white;
+      box-shadow: 0 1px 2px rgba(79, 70, 229, 0.25);
+    }
+
+    .primary:hover:not(:disabled) {
+      background: var(--accent-hover);
+    }
+
+    .primary:disabled {
+      background: #c7cbd3;
+      box-shadow: none;
+    }
+
+    .secondary {
+      border: 1px solid var(--line2);
+      background: var(--card);
+      color: var(--text-2);
+    }
+
+    .secondary:hover:not(:disabled) {
+      background: var(--soft);
+      border-color: #b8bec8;
+      color: var(--text);
+    }
+
+    .secondary:disabled {
+      background: #f9fafb;
+      color: var(--faint);
+      cursor: not-allowed;
+    }
+
+    .primary:active:not(:disabled),
+    .secondary:active:not(:disabled),
+    .toggle-chip:active,
+    .fab-item:active,
+    .gear-item:active {
+      transform: translateY(1px);
+    }
+
+    .icon-btn {
+      width: 40px;
+      min-width: 40px;
+      padding: 0;
+    }
+
+    .actions {
+      gap: 8px;
+    }
+
+    .form-actions {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    /* 取り消しにくい操作は色で区別し、保存ボタンから離して置く */
+    #deleteEditTodo,
+    #deleteClass,
+    #deleteMakeupEdit,
+    #deleteTimetable,
+    #resetVisualSettings {
+      border-color: var(--danger-line);
+      color: #b91c1c;
+    }
+
+    #deleteEditTodo:hover:not(:disabled),
+    #deleteClass:hover:not(:disabled),
+    #deleteMakeupEdit:hover:not(:disabled),
+    #deleteTimetable:hover:not(:disabled),
+    #resetVisualSettings:hover:not(:disabled) {
+      background: var(--danger-soft);
+      border-color: #fca5a5;
+      color: #991b1b;
+    }
+
+    #deleteEditTodo,
+    #deleteClass {
+      margin-left: auto;
+    }
+
+    .toggle-chip {
+      min-height: 34px;
+      padding: 6px 12px;
+      border: 1px solid var(--line2);
+      border-radius: 999px;
+      background: var(--card);
+      color: var(--text-2);
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .toggle-chip.active {
+      border-color: var(--accent-line);
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+
+    /* セグメント切り替え */
+    .week-board-toggle {
+      padding: 3px;
+      gap: 2px;
+      border: 0;
+      border-radius: 10px;
+      background: #e8eaee;
+    }
+
+    .week-mode-button {
+      padding: 7px 16px;
+      border-radius: 8px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .week-mode-button.active {
+      background: var(--card);
+      color: var(--text);
+      box-shadow: 0 1px 3px rgba(17, 24, 39, 0.12);
+    }
+
+    /* =====================================================================
+       入力欄
+       ===================================================================== */
+    .form {
+      gap: 14px;
+    }
+
+    label {
+      gap: 6px;
+      color: var(--text-2);
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="file"]),
+    select,
+    textarea {
+      min-height: 44px;
+      padding: 10px 12px;
+      border: 1px solid var(--line2);
+      border-radius: 10px;
+      background-color: var(--card);
+      color: var(--text);
+      font-size: 15px;
+      font-weight: 400;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    select {
+      -webkit-appearance: none;
+      appearance: none;
+      padding-right: 34px;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+    }
+
+    textarea {
+      min-height: 88px;
+      line-height: 1.6;
+    }
+
+    input::placeholder,
+    textarea::placeholder {
+      color: var(--faint);
+    }
+
+    input:not([type="checkbox"]):not([type="radio"]):hover:not(:disabled):not(:focus),
+    select:hover:not(:disabled):not(:focus),
+    textarea:hover:not(:disabled):not(:focus) {
+      border-color: #b8bec8;
+    }
+
+    input:not([type="checkbox"]):not([type="radio"]):focus,
+    select:focus,
+    textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--focus-ring);
+    }
+
+    input:disabled,
+    select:disabled {
+      background-color: #f9fafb;
+      color: var(--faint);
+    }
+
+    input[type="file"] {
+      font-size: 13px;
+      font-weight: 400;
+      color: var(--muted);
+    }
+
+    input[type="file"]::file-selector-button {
+      margin-right: 10px;
+      padding: 7px 12px;
+      border: 1px solid var(--line2);
+      border-radius: 8px;
+      background: var(--card);
+      color: var(--text-2);
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    input[type="color"] {
+      width: 56px;
+      height: 36px;
+      padding: 3px;
+      border: 1px solid var(--line2);
+      border-radius: 8px;
+      background: var(--card);
+    }
+
+    #categorySearch {
+      padding-left: 38px;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: 12px center;
+    }
+
+    .override-class-row {
+      border-color: var(--line);
+      border-radius: 12px;
+      background: #f9fafb;
+      font-size: 14px;
+      font-weight: 400;
+    }
+
+    .repeat-note {
+      margin-top: -8px;
+    }
+
+    /* =====================================================================
+       Todoカード（左の縦線＝重要度の色）
+       ===================================================================== */
+    .todo-card {
+      gap: 12px;
+      margin-bottom: 8px;
+      padding: 14px 12px 14px 14px;
+      border-style: solid !important;
+      border-width: 1px 1px 1px 4px !important;
+      border-top-color: var(--line) !important;
+      border-right-color: var(--line) !important;
+      border-bottom-color: var(--line) !important;
+      border-radius: 12px;
+      background: var(--card);
+      box-shadow: var(--shadow-sm);
+      transition: box-shadow 0.15s ease;
+    }
+
+    .todo-card:hover {
+      box-shadow: var(--shadow-md);
+    }
+
+    .todo-card.overdue {
+      border-left-color: var(--danger) !important;
+    }
+
+    .todo-left {
+      flex: 1 1 auto;
+      gap: 12px;
+    }
+
+    .todo-main {
+      flex: 1 1 auto;
+    }
+
+    .todo-title {
+      font-size: 15px;
+      font-weight: 600;
+      line-height: 1.45;
+    }
+
+    .todo-title.done {
+      color: var(--faint);
+    }
+
+    .todo-detail {
+      margin: 3px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+      white-space: pre-wrap;
+    }
+
+    .todo-meta {
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .attached-image {
+      margin-top: 10px;
+      border-radius: 10px;
+    }
+
+    /* 丸いチェックボックス */
+    .todo-left input[type="checkbox"][data-action="toggle"] {
+      -webkit-appearance: none;
+      appearance: none;
+      display: grid;
+      place-items: center;
+      width: 22px;
+      height: 22px;
+      min-width: 22px;
+      margin: 0;
+      border: 1.8px solid #c4c9d2;
+      border-radius: 50%;
+      background: var(--card);
+      cursor: pointer;
+      transition: border-color 0.15s ease, background-color 0.15s ease;
+    }
+
+    .todo-left input[type="checkbox"][data-action="toggle"]:hover {
+      border-color: var(--accent);
+    }
+
+    .todo-left input[type="checkbox"][data-action="toggle"]:checked {
+      border-color: var(--accent);
+      background: var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12.5 4.5 4.5L19 7.5'/%3E%3C/svg%3E") center / 14px no-repeat;
+    }
+
+    .card-actions {
+      display: flex;
+      gap: 2px;
+      align-self: flex-start;
+    }
+
+    .delete,
+    .copy-event {
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      padding: 0;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--faint);
+    }
+
+    .delete .icon,
+    .copy-event .icon {
+      width: 18px;
+      height: 18px;
+    }
+
+    .copy-event:hover {
+      background: var(--soft);
+      color: var(--text-2);
+    }
+
+    .delete:hover {
+      background: var(--danger-soft);
+      color: var(--danger);
+    }
+
+    /* ラベル類 */
+    .badge,
+    .kind-badge,
+    .importance-badge,
+    .certainty-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 22px;
+      padding: 0 8px;
+      border: 0;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      line-height: 1.3;
+      white-space: nowrap;
+    }
+
+    .badge {
+      background: var(--soft);
+      color: var(--text-2);
+    }
+
+    .kind-badge {
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .importance-badge {
+      color: #1f2937;
+    }
+
+    .certainty-badge {
+      background: var(--card);
+      color: var(--text-2);
+      box-shadow: inset 0 0 0 1px var(--line2);
+    }
+
+    /* =====================================================================
+       週：Todo表
+       ===================================================================== */
+    .week-controls {
+      gap: 8px;
+      margin: 0 0 12px;
+    }
+
+    #weekTodoControls label {
+      flex: 0 1 240px;
+    }
+
+    .table-wrap {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--card);
+      box-shadow: var(--shadow-sm);
+    }
+
+    th {
+      padding: 8px 4px;
+      border-bottom: 1px solid var(--line);
+      background: #fafbfc;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    th:first-child {
+      background: #fafbfc;
+    }
+
+    td {
+      border-top: 1px solid var(--hair);
+      border-left: 1px solid var(--hair);
+      padding: 4px;
+    }
+
+    td:first-child {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .parent-name {
+      color: var(--faint);
+      font-size: 11px;
+    }
+
+    .date-head.today {
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+
+    .week-count-pill {
+      border: 0;
+      font-size: 9px;
+      font-weight: 600;
+    }
+
+    .parent-group-row td {
+      border-top: 1px solid var(--line);
+      background: #fafbfc;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .week-move-buttons button,
+    .parent-group-buttons button {
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--faint);
+    }
+
+    .week-move-buttons button {
+      width: 22px;
+      height: 18px;
+    }
+
+    .week-move-buttons button:hover:not(:disabled),
+    .parent-group-buttons button:hover:not(:disabled) {
+      background: var(--soft);
+      color: var(--text);
+    }
+
+    .week-move-buttons button:disabled,
+    .parent-group-buttons button:disabled {
+      background: transparent;
+      color: #e1e4e8;
+    }
+
+    .mini-todo {
+      margin-bottom: 3px;
+      padding: 4px 3px 4px 5px;
+      border-style: solid !important;
+      border-width: 1px 1px 1px 3px !important;
+      border-top-color: var(--line) !important;
+      border-right-color: var(--line) !important;
+      border-bottom-color: var(--line) !important;
+      border-radius: 6px;
+      background: var(--card);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .mini-todo.overdue {
+      border-left-color: var(--danger) !important;
+    }
+
+    .mini-todo.done {
+      background: #fafbfc;
+      box-shadow: none;
+    }
+
+    .mini-title {
+      font-size: 11px;
+      font-weight: 600;
+      line-height: 1.3;
+    }
+
+    .mini-meta {
+      gap: 3px;
+      margin-top: 3px;
+    }
+
+    .mini-meta > span {
+      white-space: nowrap;
+    }
+
+    .mini-meta .importance-badge,
+    .mini-meta .certainty-badge,
+    .mini-meta .badge {
+      min-height: 15px;
+      padding: 0 5px;
+      border-radius: 4px;
+      font-size: 9px;
+    }
+
+    .mini-todo .small-btn[data-action="toggle"] {
+      display: inline-grid;
+      place-items: center;
+      width: 15px;
+      height: 15px;
+      min-width: 15px;
+      margin-top: 1px;
+      padding: 0;
+      border: 1.5px solid #c4c9d2;
+      border-radius: 50%;
+      background: var(--card);
+      color: transparent;
+      font-size: 9px;
+      line-height: 1;
+    }
+
+    .mini-todo .small-btn[data-action="toggle"]:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .mini-todo.done .small-btn[data-action="toggle"] {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: white;
+    }
+
+    .mini-todo .small-btn[data-action="delete"] {
+      border-radius: 4px;
+      color: var(--faint);
+    }
+
+    .mini-todo .small-btn[data-action="delete"]:hover {
+      background: var(--danger-soft);
+      color: var(--danger);
+    }
+
+    @media (hover: hover) {
+      .mini-todo .small-btn[data-action="delete"] {
+        opacity: 0;
+      }
+
+      .mini-todo:hover .small-btn[data-action="delete"],
+      .mini-todo .small-btn[data-action="delete"]:focus-visible {
+        opacity: 1;
+      }
+    }
+
+    /* =====================================================================
+       週：予定カレンダー
+       ===================================================================== */
+    .week-schedule-range {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .week-schedule-wrap {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .week-schedule-corner,
+    .week-all-day-label {
+      background: var(--card);
+    }
+
+    .week-schedule-date {
+      padding: 8px 2px 6px;
+      border-left-color: var(--hair);
+      background: var(--card);
+      color: var(--text);
+      font-size: 17px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .week-schedule-date:hover:not(.today) {
+      background: #fafbfc;
+    }
+
+    .week-schedule-date.today {
+      background: var(--card);
+      color: var(--accent);
+      box-shadow: inset 0 -2px 0 var(--accent);
+    }
+
+    .week-schedule-day-small {
+      margin-bottom: 1px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    .week-schedule-date.today .week-schedule-day-small {
+      color: var(--accent);
+    }
+
+    .week-schedule-count {
+      border: 0;
+      background: var(--soft);
+      color: var(--muted);
+      font-weight: 500;
+    }
+
+    .week-all-day-label {
+      color: var(--faint);
+      font-weight: 600;
+    }
+
+    .week-all-day-cell {
+      border-left-color: var(--hair);
+      background: #fafbfc;
+    }
+
+    .week-all-day-chip {
+      border: 0 !important;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+
+    .week-schedule-labels {
+      border-right-color: var(--hair);
+    }
+
+    .week-schedule-hour-label {
+      color: var(--faint);
+      font-weight: 500;
+    }
+
+    .week-day-column {
+      border-left-color: var(--hair);
+      background: repeating-linear-gradient(
+        to bottom,
+        #ffffff 0,
+        #ffffff calc(var(--week-hour-height) - 1px),
+        var(--hair) calc(var(--week-hour-height) - 1px),
+        var(--hair) var(--week-hour-height)
+      );
+    }
+
+    .week-day-column.today {
+      background: repeating-linear-gradient(
+        to bottom,
+        #fafaff 0,
+        #fafaff calc(var(--week-hour-height) - 1px),
+        #e9ebfb calc(var(--week-hour-height) - 1px),
+        #e9ebfb var(--week-hour-height)
+      );
+    }
+
+    .week-event-block {
+      padding: 3px 4px;
+      border-style: solid !important;
+      border-width: 0 0 0 3px !important;
+      border-left-color: rgba(17, 24, 39, 0.22) !important;
+      border-radius: 5px;
+      box-shadow: none;
+    }
+
+    .week-event-title {
+      font-weight: 600;
+    }
+
+    .week-event-meta {
+      color: rgba(17, 24, 39, 0.62);
+    }
+
+    /* =====================================================================
+       月カレンダー
+       ===================================================================== */
+    .month-controls {
+      gap: 6px;
+    }
+
+    .month-title {
+      min-width: 118px;
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .month-grid {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--card);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .weekday {
+      padding: 8px 0;
+      border-left: 0;
+      border-bottom: 1px solid var(--line);
+      background: var(--card);
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .weekday:nth-child(1) {
+      color: #dc2626;
+    }
+
+    .weekday:nth-child(7) {
+      color: #2563eb;
+    }
+
+    .month-cell {
+      min-height: 104px;
+      padding: 5px 4px;
+      border-left-color: var(--hair);
+      border-top-color: var(--hair);
+      cursor: pointer;
+      transition: background 0.12s ease;
+    }
+
+    .month-cell:not(.today):hover {
+      background: #fafbfc;
+    }
+
+    .month-cell.outside {
+      background: #fbfbfc;
+    }
+
+    .month-cell.today {
+      background: #fafaff;
+      box-shadow: none;
+    }
+
+    .month-day {
+      display: inline-grid;
+      place-items: center;
+      min-width: 22px;
+      height: 22px;
+      margin-bottom: 3px;
+      padding: 0 5px;
+      border-radius: 11px;
+      color: var(--text-2);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .month-cell:not(.outside):nth-child(7n + 8) .month-day {
+      color: #dc2626;
+    }
+
+    .month-cell:not(.outside):nth-child(7n + 14) .month-day {
+      color: #2563eb;
+    }
+
+    .month-cell.outside .month-day {
+      color: #c4c8cf;
+    }
+
+    .month-cell.today .month-day {
+      background: var(--accent);
+      color: white !important;
+    }
+
+    .month-mini {
+      padding: 2px 5px;
+      border-radius: 4px;
+      font-size: 10.5px;
+      font-weight: 500;
+    }
+
+    .month-more {
+      padding-left: 4px;
+      color: var(--muted);
+      font-size: 10.5px;
+    }
+
+    /* =====================================================================
+       日別
+       ===================================================================== */
+    .day-nav {
+      grid-template-columns: 40px minmax(0, 1fr) 40px auto;
+      align-items: center;
+      gap: 6px;
+      width: min(420px, 100%);
+    }
+
+    #prevDay,
+    #nextDay {
+      align-self: center;
+    }
+
+    #todayDay {
+      padding-left: 14px;
+      padding-right: 14px;
+    }
+
+    .date-with-weekday {
+      grid-template-columns: minmax(0, 1fr) 24px;
+      gap: 6px;
+    }
+
+    .day-weekday {
+      color: var(--text-2);
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .all-day-box {
+      margin: 18px 0 12px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+    }
+
+    .day-timeline-card {
+      margin-top: 18px;
+      padding: 16px 16px 12px;
+    }
+
+    .day-timeline-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .day-timeline-head h2 {
+      font-size: 16px;
+    }
+
+    .timeline-controls {
+      margin-top: 0;
+      gap: 6px;
+    }
+
+    .visual-timeline {
+      margin-top: 14px;
+      border-top: 0;
+      border-bottom: 0;
+    }
+
+    .timeline-labels {
+      border-right: 0;
+    }
+
+    .timeline-area {
+      background: none;
+    }
+
+    .timeline-hour-label {
+      color: var(--faint);
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    .timeline-hour-line {
+      background: var(--hair);
+    }
+
+    .timeline-event-block {
+      padding: 6px 10px;
+      border-style: solid !important;
+      border-width: 0 0 0 4px !important;
+      border-radius: 8px;
+      box-shadow: none;
+    }
+
+    .timeline-event-block:not(.class-item) {
+      border-left-color: rgba(17, 24, 39, 0.22) !important;
+    }
+
+    .timeline-event-block.class-item {
+      background: #f6f7f9;
+    }
+
+    .timeline-event-title {
+      font-weight: 600;
+    }
+
+    /* 時刻ラベルの最初と最後が枠で切れないようにする */
+    .timeline-hour-label:first-child,
+    .week-schedule-hour-label:first-child {
+      transform: none;
+    }
+
+    .timeline-hour-label:last-child,
+    .week-schedule-hour-label:last-child {
+      transform: translateY(-100%);
+    }
+
+    /* =====================================================================
+       カテゴリ別
+       ===================================================================== */
+    #categoryView .view-head {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    #categoryView .view-head > .week-controls {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px;
+    }
+
+    #categoryView .view-head > .week-controls label {
+      min-width: 0;
+    }
+
+    #categoryView .view-head > .week-controls label:first-child {
+      grid-column: 1 / -1;
+    }
+
+    div.selected {
+      margin: 0 0 10px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+    }
+
+    div.selected .small {
+      display: none;
+    }
+
+    div.selected .large {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    /* =====================================================================
+       時間割
+       ===================================================================== */
+    /* 授業編集はモーダルで開くため、「選択を解除」ボタンは表示しない */
+    .ut-toolbar {
+      display: none;
+    }
+
+    .timetable-manager {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fafbfc;
+    }
+
+    .timetable-wrap {
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+    }
+
+    .timetable-grid,
+    .override-makeup-grid {
+      gap: 4px;
+      background: transparent;
+    }
+
+    .tt-head,
+    .tt-time,
+    .override-makeup-head,
+    .override-makeup-period {
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .tt-head {
+      min-height: 30px;
+      font-size: 12px;
+    }
+
+    .tt-time {
+      color: var(--faint);
+      font-size: 10px;
+      font-weight: 500;
+      line-height: 1.35;
+    }
+
+    .tt-cell,
+    .override-makeup-cell {
+      border: 1px solid var(--hair);
+      border-radius: 10px;
+      background: #fafbfc;
+      cursor: pointer;
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+
+    .tt-cell:hover {
+      border-color: var(--accent-line);
+      background: var(--card);
+    }
+
+    .tt-card {
+      border-radius: 8px;
+      box-shadow: none;
+    }
+
+    .tt-card.empty {
+      display: grid;
+      place-items: center;
+    }
+
+    .tt-cell:hover .tt-card.empty::after {
+      content: "+";
+      color: var(--accent);
+      font-size: 20px;
+      font-weight: 400;
+      line-height: 1;
+    }
+
+    .tt-title {
+      color: #1f2937;
+      font-weight: 600;
+    }
+
+    .tt-room,
+    .override-makeup-class-room {
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.8);
+      font-weight: 500;
+    }
+
+    .override-makeup-grid-wrap {
+      border: 0;
+      background: transparent;
+    }
+
+    .override-makeup-class-button {
+      border-radius: 7px;
+      box-shadow: none;
+      font-weight: 600;
+    }
+
+    .override-makeup-class-button.selected {
+      outline: 2px solid var(--accent);
+      outline-offset: 1px;
+    }
+
+    .override-makeup-box {
+      border-color: var(--line);
+      border-radius: 12px;
+    }
+
+    .override-makeup-item {
+      border-color: var(--line);
+      border-radius: 10px;
+      background: #fafbfc;
+    }
+
+    .override-makeup-title {
+      font-weight: 600;
+    }
+
+    .preset-button {
+      padding: 6px;
+      border-radius: 10px;
+      color: var(--text-2);
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .preset-button.selected {
+      outline: 2px solid var(--accent);
+      outline-offset: 1px;
+    }
+
+    .preset-swatch {
+      height: 26px;
+      border-radius: 6px;
+    }
+
+    /* =====================================================================
+       カテゴリ管理・設定・データ
+       ===================================================================== */
+    .category-box {
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fafbfc;
+    }
+
+    .category-box p {
+      font-weight: 600;
+    }
+
+    .chip,
+    .chip-with-delete {
+      border: 1px solid var(--line);
+      background: var(--card);
+      color: var(--text-2);
+      font-size: 13px;
+    }
+
+    .category-edit,
+    .category-delete {
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    details.settings-box {
+      padding: 12px 16px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--card);
+    }
+
+    details.settings-box > summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 4px 0;
+      color: var(--text);
+      font-size: 15px;
+      font-weight: 600;
+      list-style: none;
+    }
+
+    details.settings-box > summary::-webkit-details-marker {
+      display: none;
+    }
+
+    details.settings-box > summary::after {
+      content: "";
+      flex: 0 0 auto;
+      width: 7px;
+      height: 7px;
+      margin-right: 4px;
+      border-right: 2px solid var(--faint);
+      border-bottom: 2px solid var(--faint);
+      transform: rotate(45deg) translateY(-2px);
+      transition: transform 0.15s ease;
+    }
+
+    details.settings-box[open] > summary::after {
+      transform: rotate(-135deg) translateY(-2px);
+    }
+
+    .color-row,
+    .label-row {
+      border-bottom-color: var(--hair);
+    }
+
+    .color-label,
+    .label-name {
+      font-weight: 600;
+    }
+
+    /* =====================================================================
+       モーダル（見出しと操作ボタンを常に表示）
+       ===================================================================== */
+    .modal-backdrop,
+    .tt-detail-panel,
+    .color-sheet-backdrop {
+      background: rgba(17, 24, 39, 0.42);
+    }
+
+    .modal,
+    .tt-editor-card {
+      padding: 0 20px;
+      border-radius: 18px;
+      box-shadow: var(--shadow-lg);
+    }
+
+    .modal-head,
+    .tt-editor-head {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      margin: 0 0 14px;
+      padding: 18px 0 12px;
+      border-bottom: 1px solid var(--line);
+      background: var(--card);
+    }
+
+    .modal h2,
+    .tt-editor-card h2 {
+      font-size: 18px;
+    }
+
+    .modal .form > .actions:last-child,
+    .tt-editor-card .form > .actions:last-child {
+      position: sticky;
+      bottom: 0;
+      z-index: 5;
+      margin-top: 4px;
+      padding: 12px 0 18px;
+      border-top: 1px solid var(--line);
+      background: var(--card);
+    }
+
+    .modal-close,
+    .tt-editor-close {
+      min-height: 34px;
+      padding: 6px 12px;
+      border: 0;
+      border-radius: 8px;
+      background: var(--soft);
+      color: var(--text-2);
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .modal-close:hover,
+    .tt-editor-close:hover {
+      background: #e8eaee;
+      color: var(--text);
+    }
+
+    .color-sheet {
+      border-radius: 18px;
+      background: var(--card);
+    }
+
+    .color-sheet h2 {
+      font-size: 20px;
+    }
+
+    /* =====================================================================
+       PC幅：左サイドバー
+       ===================================================================== */
+    @media (min-width: 900px) {
+      .app {
+        display: grid;
+        grid-template-columns: 216px minmax(0, 1fr);
+        align-items: start;
+        gap: 32px;
+        padding: 28px 28px 64px;
+      }
+
+      .header {
+        position: sticky;
+        top: 28px;
+        display: flex;
+        flex-direction: column;
+        gap: 22px;
+        margin: 0;
+        padding: 0;
+        border: 0;
+        background: transparent;
+      }
+
+      .header-top {
+        display: contents;
+      }
+
+      .brand {
+        order: 0;
+        align-items: flex-start;
+        padding: 0 8px;
+      }
+
+      .brand-text {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 3px;
+      }
+
+      .brand-text h1 {
+        font-size: 15px;
+        line-height: 1.3;
+        white-space: normal;
+      }
+
+      .tabs {
+        order: 1;
+        position: static;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+      }
+
+      .tab {
+        flex-direction: row;
+        justify-content: flex-start;
+        gap: 10px;
+        min-height: 0;
+        padding: 9px 10px;
+        color: var(--text-2);
+        font-size: 14px;
+        font-weight: 500;
+      }
+
+      .tab .icon {
+        width: 19px;
+        height: 19px;
+        color: var(--muted);
+      }
+
+      .tab:hover {
+        background: #e8eaee;
+        color: var(--text);
+      }
+
+      .tab.active {
+        background: var(--card);
+        color: var(--accent);
+        font-weight: 600;
+        box-shadow: var(--shadow-sm), inset 0 0 0 1px var(--line);
+      }
+
+      .tab.active .icon {
+        color: var(--accent);
+      }
+
+      .gear-wrap {
+        order: 2;
+      }
+
+      .gear-button {
+        display: none;
+      }
+
+      .gear-menu,
+      .gear-menu.show {
+        position: static;
+        display: block;
+        width: auto;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        box-shadow: none;
+      }
+
+      .gear-menu::before {
+        content: "管理";
+        display: block;
+        padding: 0 10px 6px;
+        color: var(--faint);
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+      }
+
+      .gear-item {
+        padding: 9px 10px;
+      }
+
+      .gear-item:hover {
+        background: #e8eaee;
+      }
+
+      .gear-item.active {
+        background: var(--card);
+        box-shadow: var(--shadow-sm), inset 0 0 0 1px var(--line);
+        font-weight: 600;
+      }
+
+      main {
+        min-width: 0;
+      }
+
+      .fab-wrap {
+        right: 32px;
+        bottom: 32px;
+      }
+
+      .form-card {
+        margin-left: 0;
+      }
+    }
+
+    /* =====================================================================
+       スマホ幅
+       ===================================================================== */
+    @media (max-width: 720px) {
+      .app {
+        padding-left: 14px;
+        padding-right: 14px;
+      }
+
+      .header {
+        margin: 0 -14px 12px;
+        padding-left: 14px;
+        padding-right: 14px;
+      }
+
+      .view-head {
+        align-items: stretch;
+      }
+
+      .view-head h2,
+      .section-title h2 {
+        font-size: 20px;
+      }
+
+      .card {
+        padding: 16px;
+      }
+
+      /* iOS Safariで入力時に画面が拡大されないよう16px以上にする */
+      input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="file"]),
+      select,
+      textarea {
+        font-size: 16px;
+      }
+
+      .month-controls {
+        justify-content: space-between;
+      }
+
+      .month-title {
+        order: -1;
+        flex: 1 1 auto;
+        text-align: left;
+        font-size: 18px;
+      }
+
+      .month-cell {
+        min-height: 84px;
+        padding: 4px 2px;
+      }
+
+      .month-day {
+        min-width: 20px;
+        height: 20px;
+        font-size: 11px;
+      }
+
+      .month-mini {
+        padding: 1px 3px;
+        font-size: 9px;
+      }
+
+      .day-nav {
+        width: 100%;
+      }
+
+      .week-board-toggle {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .week-schedule-nav {
+        grid-template-columns: 40px minmax(0, 1fr) 40px;
+      }
+
+      #weekTodoControls label {
+        flex: 1 1 auto;
+      }
+
+      .todo-card {
+        padding: 12px 10px 12px 12px;
+      }
+
+      .tt-cell,
+      .override-makeup-cell {
+        border-radius: 8px;
+      }
+
+      /* モーダルは下からのシート表示にする */
+      .modal-backdrop,
+      .tt-detail-panel {
+        place-items: end center;
+        padding: 0;
+      }
+
+      .modal,
+      .tt-editor-card {
+        width: 100%;
+        max-height: 92vh;
+        padding: 0 16px;
+        border-radius: 20px 20px 0 0;
+        animation: sheetUp 0.22s ease;
+      }
+
+      .modal .form > .actions:last-child,
+      .tt-editor-card .form > .actions:last-child {
+        padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+      }
+    }
+
+    @keyframes sheetUp {
+      from {
+        transform: translateY(28px);
+        opacity: 0.6;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+      }
+    }
+
   </style>
 
   <link rel="manifest" href="manifest.webmanifest" />
@@ -2359,27 +4314,30 @@
   <div class="app">
     <header class="header">
       <div class="header-top">
-        <div>
-          <p class="subtitle">カテゴリと日程で管理するTodoアプリ v96</p>
-          <h1>Todo Calendar Board</h1>
+        <div class="brand">
+          <span class="brand-mark"><svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 9.5h16M8.5 3v3.5M15.5 3v3.5"/><path d="m9 14.5 2 2 4-4.2"/></svg></span>
+          <div class="brand-text">
+            <h1>Todo Calendar Board</h1>
+            <span class="version-badge" title="バージョン">v98</span>
+          </div>
         </div>
 
         <div class="gear-wrap">
-          <button id="gearButton" class="gear-button" aria-label="設定メニューを開く">⚙</button>
+          <button id="gearButton" class="gear-button" type="button" aria-label="設定メニューを開く"><svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="17" r="2"/></svg></button>
           <div id="gearMenu" class="gear-menu" aria-hidden="true">
-            <button class="gear-item" data-gear-view="timetable">時間割</button>
-            <button class="gear-item" data-gear-view="manage">カテゴリ管理</button>
-            <button class="gear-item" data-gear-view="settings">表示設定</button>
-            <button class="gear-item" data-gear-view="data">データ管理</button>
+            <button class="gear-item" type="button" data-gear-view="timetable"><svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 9.5h17M3.5 14.5h17M9 4.5v15"/></svg><span>時間割</span></button>
+            <button class="gear-item" type="button" data-gear-view="manage"><svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3.5 12.2V5a1.5 1.5 0 0 1 1.5-1.5h7.2l8.3 8.3a1.5 1.5 0 0 1 0 2.1l-6.1 6.1a1.5 1.5 0 0 1-2.1 0z"/><path d="M8 8h.01"/></svg><span>カテゴリ管理</span></button>
+            <button class="gear-item" type="button" data-gear-view="settings"><svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3.5a8.5 8.5 0 1 0 0 17c1.1 0 1.6-.8 1.6-1.6 0-.5-.2-.8-.5-1.2-.3-.4-.5-.7-.5-1.2 0-.9.7-1.5 1.6-1.5h1.9a4.4 4.4 0 0 0 4.4-4.4C20.5 6.8 16.7 3.5 12 3.5Z"/><path d="M7.5 11.5h.01M9.5 7.8h.01M14 7.3h.01M17 10.5h.01"/></svg><span>表示設定</span></button>
+            <button class="gear-item" type="button" data-gear-view="data"><svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><ellipse cx="12" cy="6" rx="7.5" ry="2.8"/><path d="M4.5 6v12c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8V6"/><path d="M4.5 12c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8"/></svg><span>データ管理</span></button>
           </div>
         </div>
       </div>
       <nav class="tabs" aria-label="表示切り替え">
-        <button class="tab active" data-view-button="matrix">週</button>
-        <button class="tab" data-view-button="month">月</button>
-        <button class="tab" data-view-button="day">日別</button>
-        <button class="tab" data-view-button="category">カテゴリ</button>
-        <button class="tab" data-view-button="completed">完了</button>
+        <button class="tab active" type="button" data-view-button="matrix"><svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M9 9.5v11M15 9.5v11"/></svg><span>週</span></button>
+        <button class="tab" type="button" data-view-button="month"><svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/><path d="M7.5 13.5h.01M12 13.5h.01M16.5 13.5h.01M7.5 17h.01M12 17h.01"/></svg><span>月</span></button>
+        <button class="tab" type="button" data-view-button="day"><svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg><span>日別</span></button>
+        <button class="tab" type="button" data-view-button="category"><svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3.5 7.5a2 2 0 0 1 2-2h3.8l2 2h7.2a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></svg><span>カテゴリ</span></button>
+        <button class="tab" type="button" data-view-button="completed"><svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="m8.5 12.2 2.4 2.4 4.6-5"/></svg><span>完了</span></button>
       </nav>
     </header>
 
@@ -2388,10 +4346,10 @@
         <div class="view-head">
           <div>
             <h2>週カレンダー</h2>
-            <p class="desc">Todo表は今日から7日分、予定カレンダーは指定した開始日から7日分を表示します。予定カレンダーは1日ずつ前後に移動できます。</p>
+            <p class="desc">Todo表は今日から7日間、予定カレンダーは指定した開始日から7日間を表示します。</p>
           </div>
           <div class="actions">
-            <button class="secondary" id="openFabHint">右下＋で追加、右上⚙で管理</button>
+            <button class="secondary hint-chip" id="openFabHint" type="button">右下＋で追加、右上⚙で管理</button>
           </div>
         </div>
         <div class="week-controls">
@@ -2402,9 +4360,9 @@
         </div>
         <div id="weekScheduleControls" class="week-controls hidden-field">
           <div class="week-schedule-nav" aria-label="週予定カレンダーの期間移動">
-            <button id="prevWeekSchedule" type="button" class="secondary">1日前</button>
+            <button id="prevWeekSchedule" type="button" class="secondary icon-btn" aria-label="1日前" title="1日前"><svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m14.5 6-6 6 6 6"/></svg></button>
             <div id="weekScheduleRange" class="week-schedule-range"></div>
-            <button id="nextWeekSchedule" type="button" class="secondary">1日後</button>
+            <button id="nextWeekSchedule" type="button" class="secondary icon-btn" aria-label="1日後" title="1日後"><svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9.5 6 6 6-6 6"/></svg></button>
             <button id="thisWeekSchedule" type="button" class="secondary">今日から</button>
             <label class="week-schedule-jump">
               開始日を指定
@@ -2432,9 +4390,9 @@
             <p class="desc">月単位でTodoを確認できます。</p>
           </div>
           <div class="month-controls">
-            <button id="prevMonth" class="secondary">前月</button>
+            <button id="prevMonth" type="button" class="secondary icon-btn" aria-label="前月" title="前月"><svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m14.5 6-6 6 6 6"/></svg></button>
             <div id="monthTitle" class="month-title"></div>
-            <button id="nextMonth" class="secondary">翌月</button>
+            <button id="nextMonth" type="button" class="secondary icon-btn" aria-label="翌月" title="翌月"><svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9.5 6 6 6-6 6"/></svg></button>
             <button id="thisMonth" class="secondary">今月</button>
           </div>
         </div>
@@ -2448,20 +4406,21 @@
             <p class="desc">指定した日のTodoを一覧します。予定は下の24時間表示に出ます。</p>
           </div>
           <div class="day-nav">
-            <button id="prevDay" class="secondary">前日</button>
+            <button id="prevDay" type="button" class="secondary icon-btn" aria-label="前日" title="前日"><svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m14.5 6-6 6 6 6"/></svg></button>
             <div class="day-date-stack">
               <label class="day-date-label">
-                表示する日
+                <span class="visually-hidden">表示する日</span>
                 <div class="date-with-weekday">
                   <input id="selectedDate" type="date" />
                   <span id="selectedWeekday" class="day-weekday">月</span>
                 </div>
               </label>
-              <button id="todayDay" class="secondary">今日</button>
             </div>
-            <button id="nextDay" class="secondary">翌日</button>
+            <button id="nextDay" type="button" class="secondary icon-btn" aria-label="翌日" title="翌日"><svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9.5 6 6 6-6 6"/></svg></button>
+            <button id="todayDay" type="button" class="secondary">今日</button>
           </div>
         </div>
+        <h3 class="block-title">この日のTodo</h3>
         <div id="dayTodos"></div>
         <div id="dayTimeline" style="margin-top:12px;"></div>
       </section>
@@ -2625,7 +4584,10 @@
             </label>
 
             <div id="todoWarn" class="warn">Todoは題名と子カテゴリ、予定は題名を入力してください。</div>
-            <button id="addTodo" class="primary">追加する</button>
+            <div class="form-actions">
+              <button id="cancelAddTodo" class="secondary" type="button">キャンセル</button>
+              <button id="addTodo" class="primary">追加する</button>
+            </div>
           </div>
         </section>
       </section>
@@ -2891,10 +4853,10 @@
 
   <div class="fab-wrap">
     <div id="fabMenu" class="fab-menu" aria-hidden="true">
-      <button class="fab-item" data-fab-view="add" data-fab-kind="todo">Todoを追加</button>
-      <button class="fab-item" data-fab-view="add" data-fab-kind="event">予定を追加</button>
+      <button class="fab-item" type="button" data-fab-view="add" data-fab-kind="todo"><svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="m8.5 12.2 2.4 2.4 4.6-5"/></svg><span>Todoを追加</span></button>
+      <button class="fab-item" type="button" data-fab-view="add" data-fab-kind="event"><svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/><path d="M7.5 13.5h.01M12 13.5h.01M16.5 13.5h.01M7.5 17h.01M12 17h.01"/></svg><span>予定を追加</span></button>
     </div>
-    <button id="fabButton" class="fab" aria-label="追加メニューを開く">＋</button>
+    <button id="fabButton" class="fab" type="button" aria-label="追加メニューを開く"><svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg></button>
   </div>
 
 
@@ -3384,6 +5346,7 @@
     let pendingTodoImageData = "";
     let pendingEditImageData = "";
     let dayOverrideDraftExtraClasses = [];
+    let addReturnView = "matrix";
 
     const els = {
       todoKind: document.getElementById("todoKind"),
@@ -5084,7 +7047,7 @@
         .sort((a, b) => String(a.title || "").localeCompare(String(b.title || "")));
       if (!events.length) return "";
       const visible = events.slice(0, 3).map(todo => `
-        <div class="week-all-day-chip" data-action="edit" data-id="${escapeHtml(todo.id)}" style="background:${certaintyColor(todo.certaintyId)}; border:1px solid ${certaintyColor(todo.certaintyId)};">
+        <div class="week-all-day-chip" title="${escapeHtml(todo.title)}" data-action="edit" data-id="${escapeHtml(todo.id)}" style="background:${certaintyColor(todo.certaintyId)}; border:1px solid ${certaintyColor(todo.certaintyId)};">
           ${escapeHtml(todo.title)}
         </div>
       `).join("");
@@ -5155,6 +7118,7 @@
       return `
         <div
           class="week-event-block ${todo.kind === "class" ? "class-item" : ""}"
+          title="${escapeHtml(todo.title)}"
           data-action="${action}"
           data-id="${escapeHtml(todo.id)}"
           data-date="${escapeHtml(dateString)}"
@@ -5432,7 +7396,7 @@
           <div class="mini-row">
             <button class="small-btn" data-action="toggle" data-id="${escapeHtml(todo.id)}" title="完了切り替え">✓</button>
             <div class="task-clickable" data-action="edit" data-id="${escapeHtml(todo.id)}" style="min-width:0; flex:1;">
-              <p class="mini-title ${isDone ? "done" : ""}">${escapeHtml(todo.kind === "event" && todo.startTime ? todo.startTime + " " + todo.title : todo.title)}</p>
+              <p class="mini-title ${isDone ? "done" : ""}" title="${escapeHtml(todo.title)}">${escapeHtml(todo.kind === "event" && todo.startTime ? todo.startTime + " " + todo.title : todo.title)}</p>
               <p class="mini-meta">
                 <span class="importance-badge" style="background:${importanceColor(importanceText)}">${escapeHtml(importanceText)}</span>
                 ${todo.kind === "event" || isCarryOver ? `<span class="certainty-badge">${escapeHtml(isCarryOver ? "期限切れ" : certainty)}</span>` : ""}
@@ -5465,7 +7429,7 @@
               ${todo.kind !== "event" ? `<input type="checkbox" data-action="toggle" data-id="${escapeHtml(todo.id)}" ${todo.done ? "checked" : ""} />` : ""}
               <div class="todo-main task-clickable" data-action="edit" data-id="${escapeHtml(todo.id)}">
                 <p class="todo-title ${isDone ? "done" : ""} ${isCarryOver ? "overdue" : ""}">${escapeHtml(todo.title)}</p>
-                <p class="todo-detail">${escapeHtml(todo.detail || "詳細なし")}</p>
+                ${todo.detail ? `<p class="todo-detail">${escapeHtml(todo.detail)}</p>` : ""}
                 ${attachedImageHtml(todo)}
                 <div class="todo-meta">
                   <span class="kind-badge">${escapeHtml(kindLabel(todo.kind))}</span>
@@ -5479,8 +7443,8 @@
               </div>
             </div>
             <div class="card-actions">
-              ${todo.kind === "event" ? `<button class="copy-event" data-action="copy-event" data-id="${escapeHtml(todo.id)}">コピー</button>` : ""}
-              <button class="delete" data-action="delete" data-id="${escapeHtml(todo.id)}">削除</button>
+              ${todo.kind === "event" ? `<button class="copy-event" type="button" data-action="copy-event" data-id="${escapeHtml(todo.id)}" aria-label="予定をコピー" title="予定をコピー"><svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="8.5" y="8.5" width="11.5" height="11.5" rx="2"/><path d="M15.5 8.5V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7.5a2 2 0 0 0 2 2h2.5"/></svg></button>` : ""}
+              <button class="delete" type="button" data-action="delete" data-id="${escapeHtml(todo.id)}" aria-label="削除" title="削除"><svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4.5 7h15M10 11v5.5M14 11v5.5M6.5 7l.8 12a1.5 1.5 0 0 0 1.5 1.4h6.4a1.5 1.5 0 0 0 1.5-1.4l.8-12M9.5 7V4.8a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1V7"/></svg></button>
             </div>
           </article>
         `;
@@ -5516,7 +7480,7 @@
             <article class="todo-card" style="${visualStyleForTodo(todo, false)}">
               <div class="todo-main task-clickable" data-action="edit" data-id="${escapeHtml(todo.id)}">
                 <p class="todo-title">${escapeHtml(todo.title)}</p>
-                <p class="todo-detail">${escapeHtml(todo.detail || "詳細なし")}</p>
+                ${todo.detail ? `<p class="todo-detail">${escapeHtml(todo.detail)}</p>` : ""}
                 ${attachedImageHtml(todo)}
                 <div class="todo-meta">
                   <span class="kind-badge">予定</span>
@@ -5527,8 +7491,8 @@
                 </div>
               </div>
               <div class="card-actions">
-                <button class="copy-event" data-action="copy-event" data-id="${escapeHtml(todo.id)}">コピー</button>
-                <button class="delete" data-action="delete" data-id="${escapeHtml(todo.id)}">削除</button>
+                <button class="copy-event" type="button" data-action="copy-event" data-id="${escapeHtml(todo.id)}" aria-label="予定をコピー" title="予定をコピー"><svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="8.5" y="8.5" width="11.5" height="11.5" rx="2"/><path d="M15.5 8.5V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7.5a2 2 0 0 0 2 2h2.5"/></svg></button>
+                <button class="delete" type="button" data-action="delete" data-id="${escapeHtml(todo.id)}" aria-label="削除" title="削除"><svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4.5 7h15M10 11v5.5M14 11v5.5M6.5 7l.8 12a1.5 1.5 0 0 0 1.5 1.4h6.4a1.5 1.5 0 0 0 1.5-1.4l.8-12M9.5 7V4.8a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1V7"/></svg></button>
               </div>
             </article>
           `).join("")}</div>`
@@ -5603,9 +7567,9 @@
 
       els.dayTimeline.innerHTML = `
         ${allDayHtml}
-        <div class="card" style="box-shadow:none; border:1px solid var(--line); padding:12px;">
-          <h2>24時間表示</h2>
-          <p class="desc">開始時刻と終了時刻に合わせて表示します。時間帯が重なる予定や授業は横に並べます。</p>
+        <div class="card day-timeline-card">
+          <div class="day-timeline-head">
+          <h2>タイムライン</h2>
           <div class="timeline-controls">
             <button class="toggle-chip ${overrideActive ? "active" : ""}" data-action="open-day-override">
               振替${overrideActive ? "：" + escapeHtml(overrideSummary) : ""}
@@ -5613,6 +7577,7 @@
             <button class="toggle-chip ${state.showClassesInTimeline ? "active" : ""}" data-action="toggle-class-timeline">
               時間割: ${state.showClassesInTimeline ? "表示中" : "非表示"}
             </button>
+          </div>
           </div>
           <div class="visual-timeline" style="--timeline-height:${timelineHeight}px;">
             <div class="timeline-labels">${labels}</div>
@@ -6060,7 +8025,7 @@
               const spanInfo = monthSpanInfoForEntry(entry, date);
               const titleText = spanInfo.showTitle ? entry.todo.title : " ";
               return `
-                <div class="month-mini task-clickable ${entry.isCarryOver ? "overdue" : ""} ${spanInfo.className}" data-action="edit" data-id="${escapeHtml(entry.todo.id)}" style="${monthStyleForEntry(entry)}">
+                <div class="month-mini task-clickable ${entry.isCarryOver ? "overdue" : ""} ${spanInfo.className}" data-action="edit" data-id="${escapeHtml(entry.todo.id)}" title="${escapeHtml(entry.todo.title)}" style="${monthStyleForEntry(entry)}">
                   <span class="month-mini-inner ${spanInfo.showTitle ? "" : "empty-label"}">${escapeHtml(titleText)}</span>
                 </div>
               `;
@@ -6301,6 +8266,7 @@
     function addTodoFromSelectedClass() {
       const classTitle = els.classTitle.value.trim() || "授業";
       closeClassEditor();
+      if (state.view !== "add") addReturnView = state.view;
       state.view = "add";
       renderAll();
 
@@ -6489,6 +8455,7 @@
 
     function goFromFab(view, kind) {
       const previousView = state.view;
+      if (view === "add" && previousView !== "add") addReturnView = previousView;
       const dateForNewItem = previousView === "day" ? (state.selectedDate || todayString()) : "";
       state.view = view;
       if (view === "add" && kind) {
@@ -6519,7 +8486,7 @@
     function exportData() {
       persistActiveTimetableAliases();
       const payload = {
-        app: "Todo Calendar Board v96",
+        app: "Todo Calendar Board v98",
         storageKey: STORAGE_KEY,
         exportedAt: new Date().toISOString(),
         state
@@ -6563,6 +8530,10 @@
         const text = await file.text();
         const parsed = JSON.parse(text);
         const importedState = validateImportedState(parsed);
+        if (!window.confirm("現在のTodo・予定・時間割・カテゴリ・設定を、選択したファイルの内容で上書きします。続けますか？\n不安な場合は、先に「データを書き出す」でバックアップを保存してください。")) {
+          setDataStatus("インポートを取り消しました。現在のデータは変更していません。");
+          return;
+        }
 
         localStorage.setItem(STORAGE_KEY, JSON.stringify(importedState));
         state = loadState();
@@ -6576,8 +8547,18 @@
 
     function renderViews() {
       document.querySelectorAll("[data-view-button]").forEach(button => {
-        button.classList.toggle("active", button.dataset.viewButton === state.view);
+        const isActive = button.dataset.viewButton === state.view;
+        button.classList.toggle("active", isActive);
+        button.setAttribute("aria-current", isActive ? "page" : "false");
       });
+
+      document.querySelectorAll("[data-gear-view]").forEach(button => {
+        button.classList.toggle("active", button.dataset.gearView === state.view);
+      });
+      const gearButtonEl = document.getElementById("gearButton");
+      if (gearButtonEl) {
+        gearButtonEl.classList.toggle("active", ["timetable", "manage", "settings", "data"].includes(state.view));
+      }
 
       document.querySelectorAll(".main-view").forEach(view => {
         view.classList.remove("active");
@@ -7367,6 +9348,28 @@
     });
 
     els.addTodo.addEventListener("click", addTodo);
+    const cancelAddTodoButton = document.getElementById("cancelAddTodo");
+    if (cancelAddTodoButton) {
+      cancelAddTodoButton.addEventListener("click", () => {
+        els.todoWarn.classList.remove("show");
+        const returnableViews = ["matrix", "month", "day", "category", "completed", "timetable", "manage", "settings", "data"];
+        state.view = returnableViews.includes(addReturnView) ? addReturnView : "matrix";
+        renderAll();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      });
+    }
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape") return;
+      if (els.classColorSheet.classList.contains("show")) { closeClassPresetColorSheet(); return; }
+      if (els.copyEventModal.classList.contains("show")) { closeCopyEventModal(); return; }
+      if (els.makeupEditModal.classList.contains("show")) { closeMakeupEditModal(); return; }
+      if (els.dayOverrideModal.classList.contains("show")) { closeDayOverrideModal(); return; }
+      if (els.editModal.classList.contains("show")) { closeEditModal(); return; }
+      if (els.classEditorPanel.classList.contains("show")) { closeClassEditor(); return; }
+      closeFabMenu();
+      closeGearMenu();
+    });
     els.addParent.addEventListener("click", addParent);
     els.addChild.addEventListener("click", addChild);
     els.timelineStartHour.addEventListener("change", updateTimelineSettings);
