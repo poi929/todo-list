@@ -5,12 +5,12 @@
 // - アイコンやマニフェストは保存済みを先に返し、裏で更新する。
 // - 版ごとにキャッシュ名を変え、有効化の時に同じアプリの古いキャッシュだけを削除する
 //   （github.io の同じアカウントの別アプリのキャッシュには触れない）。
-const VERSION = "v105";
+const VERSION = "v106";
 const CACHE_PREFIX = "todo-calendar-board-";
 const CACHE_NAME = CACHE_PREFIX + VERSION;
 const HTML_URL = new URL("./index.html", self.registration.scope).href;
 const CORE_ASSETS = ["./index.html", "./manifest.webmanifest"];
-const OPTIONAL_ASSETS = ["./icon-192.png", "./icon-512.png"];
+const OPTIONAL_ASSETS = ["./icon-192.png", "./icon-512.png", "./icon-maskable-192.png", "./icon-maskable-512.png"];
 const NETWORK_TIMEOUT_MS = 4000;
 
 self.addEventListener("install", event => {

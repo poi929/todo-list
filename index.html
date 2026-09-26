@@ -793,6 +793,16 @@
       .month-week .month-cell { align-items: flex-start; }
       .m-bar .m-time { display: inline; }
     }
+
+    /* ===== 90分・105分（v106） ===== */
+    .tt-len { align-self: flex-start; margin-top: auto; padding: 0 5px; border-radius: 4px; background: rgba(17, 24, 39, .72); color: #fff; font-size: 9.5px; font-weight: 700; line-height: 15px; }
+    .tt-corner { display: grid; place-items: center; font-size: 9.5px; color: var(--faint); }
+    .period-time-head { display: grid; grid-template-columns: 52px 1fr 1fr; gap: 8px; font-size: 12px; color: var(--muted); font-weight: 600; }
+    .period-time-row { grid-template-columns: 52px 1fr 1fr; }
+    .period-time-row span small { display: block; font-size: 11px; font-weight: 600; color: var(--muted); }
+    .period-time-row.sub { margin-top: -2px; margin-bottom: 6px; }
+    .period-time-row.sub input { background: var(--surface-2); }
+    .notice-card .notice-actions .button { white-space: normal; text-align: left; }
   </style>
 </head>
 <body>
@@ -1116,6 +1126,13 @@
           </label>
           <label class="field"><span class="field-label">時限</span><select id="classPeriod"></select></label>
         </div>
+        <div class="field">
+          <span class="field-label">授業の長さ</span>
+          <div class="segmented wide" id="classDuration">
+            <button type="button" data-duration="90">90分（通常）</button>
+            <button type="button" data-duration="105">105分</button>
+          </div>
+        </div>
         <div class="two-col">
           <label class="field"><span class="field-label">開始時刻</span><input id="classStartTime" type="time" /></label>
           <label class="field"><span class="field-label">終了時刻</span><input id="classEndTime" type="time" /></label>
@@ -1273,7 +1290,7 @@
         </div>
         <label class="field"><span class="field-label">時限数</span><input id="periodCount" type="number" min="1" max="10" step="1" inputmode="numeric" /></label>
         <div id="periodTimeSettings" class="period-times"></div>
-        <p class="hint">時限の時刻を変えると、その時限の授業のうち時刻を個別に変えていない授業にも反映されます。</p>
+        <p class="hint">各時限の上の行が90分授業、下の行が105分授業の時刻です。初期値は東大（2026年度 教養学部前期課程）の授業時間です。時刻を変えると、同じ長さの授業のうち時刻を個別に変えていない授業にも反映されます。</p>
       </div>
     </section>
   </div>
@@ -1341,7 +1358,7 @@
   </div>
 
   <script>
-    const APP_VERSION = "v105";
+    const APP_VERSION = "v106";
     // 保存キーは変更しない。旧版の removeOldStorageKeys() は「todo-calendar-board-v数字」の
     // 自分以外のキーを削除するため、キー名を変えると旧版へ戻した時に新データが消える。
     const STORAGE_KEY = "todo-calendar-board-v96";
@@ -1349,6 +1366,9 @@
     const IDB_NAME = "todo-calendar-board-store";
     // ローカルストレージの上限の目安（文字数）。ブラウザ実装はおおむね5MiB。
     const LOCAL_STORAGE_LIMIT_CHARS = 5 * 1024 * 1024;
+    // 東大（2026年度 教養学部前期課程の学年暦）の授業時間
+    const UTOKYO_PERIODS_90 = { 1: ["08:30", "10:00"], 2: ["10:25", "11:55"], 3: ["13:15", "14:45"], 4: ["15:10", "16:40"], 5: ["17:05", "18:35"], 6: ["19:00", "20:30"] };
+    const UTOKYO_PERIODS_105 = { 1: ["08:30", "10:15"], 2: ["10:25", "12:10"], 3: ["13:00", "14:45"], 4: ["14:55", "16:40"], 5: ["16:50", "18:35"], 6: ["18:45", "20:30"] };
 
     // ---- 実行時の状態（保存対象の state には含めない）
     // 読み込み時の問題。null 以外なら保存を止める（壊れた読み込み結果で正常データを上書きしない）。
@@ -1448,13 +1468,22 @@
           timetableSettings: {
             periodCount: 6,
             periods: {
+              1: { start: "08:30", end: "10:00" },
+              2: { start: "10:25", end: "11:55" },
+              3: { start: "13:15", end: "14:45" },
+              4: { start: "15:10", end: "16:40" },
+              5: { start: "17:05", end: "18:35" },
+              6: { start: "19:00", end: "20:30" }
+            },
+            periods105: {
               1: { start: "08:30", end: "10:15" },
               2: { start: "10:25", end: "12:10" },
               3: { start: "13:00", end: "14:45" },
               4: { start: "14:55", end: "16:40" },
               5: { start: "16:50", end: "18:35" },
               6: { start: "18:45", end: "20:30" }
-            }
+            },
+            lengthSetupDone: true
           }
         }
       ],
@@ -1481,13 +1510,22 @@
       timetableSettings: {
         periodCount: 6,
         periods: {
+          1: { start: "08:30", end: "10:00" },
+          2: { start: "10:25", end: "11:55" },
+          3: { start: "13:15", end: "14:45" },
+          4: { start: "15:10", end: "16:40" },
+          5: { start: "17:05", end: "18:35" },
+          6: { start: "19:00", end: "20:30" }
+        },
+        periods105: {
           1: { start: "08:30", end: "10:15" },
           2: { start: "10:25", end: "12:10" },
           3: { start: "13:00", end: "14:45" },
           4: { start: "14:55", end: "16:40" },
           5: { start: "16:50", end: "18:35" },
           6: { start: "18:45", end: "20:30" }
-        }
+        },
+        lengthSetupDone: true
       },
       weekSortMode: "manual",
       weekBoardMode: "todo",
@@ -1669,6 +1707,27 @@
       return normalizeTimelineSettings(state.timelineSettings);
     }
 
+    function addMinutesToTime(time, minutes) {
+      const base = minutesFromTime(time);
+      if (base === null) return "";
+      return timeFromMinutes(Math.min(base + minutes, 23 * 60 + 59));
+    }
+
+    function normalizePeriods105(settings, periods) {
+      const result = {};
+      for (let i = 1; i <= 10; i += 1) {
+        const saved = settings?.periods105?.[i] || settings?.periods105?.[String(i)];
+        if (saved && /^\d{2}:\d{2}$/.test(saved.start || "") && /^\d{2}:\d{2}$/.test(saved.end || "")) {
+          result[i] = { start: saved.start, end: saved.end };
+        } else if (UTOKYO_PERIODS_105[i]) {
+          result[i] = { start: UTOKYO_PERIODS_105[i][0], end: UTOKYO_PERIODS_105[i][1] };
+        } else if (periods[i]?.start) {
+          result[i] = { start: periods[i].start, end: addMinutesToTime(periods[i].start, 105) };
+        }
+      }
+      return result;
+    }
+
     function normalizeTimetableSettings(settings) {
       const defaults = clone(initialState.timetableSettings);
       const rawCount = Number(settings?.periodCount ?? defaults.periodCount);
@@ -1689,7 +1748,11 @@
           end: /^\d{2}:\d{2}$/.test(saved.end || "") ? saved.end : fallback.end
         };
       }
-      return { periodCount, periods };
+      // 105分授業の時刻表と、90分・105分の設定を案内済みかどうか（旧版は無視する追加項目）
+      const periods105 = normalizePeriods105(settings, periods);
+      const result = { periodCount, periods, periods105 };
+      if (settings?.lengthSetupDone === true) result.lengthSetupDone = true;
+      return result;
     }
 
     function normalizeTimetableName(value, fallback = "時間割") {
@@ -1877,9 +1940,24 @@
 
 
 
-    function defaultPeriodTimes(period) {
-      const data = state.timetableSettings?.periods?.[Number(period)];
+    // mode：「90」（通常）または「105」
+    function defaultPeriodTimes(period, mode = "90") {
+      const table = mode === "105" ? state.timetableSettings?.periods105 : state.timetableSettings?.periods;
+      const data = table?.[Number(period)] || (mode === "105" ? null : null);
+      if (!data && mode === "105") {
+        const base = state.timetableSettings?.periods?.[Number(period)];
+        return [base?.start || "", base?.start ? addMinutesToTime(base.start, 105) : ""];
+      }
       return [data?.start || "", data?.end || ""];
+    }
+
+    // 授業の長さ。保存されていない（旧版で登録した）授業は、時刻から判断する。
+    function classDurationMode(classItem) {
+      if (classItem?.durationMode === "105" || classItem?.durationMode === "90") return classItem.durationMode;
+      const [s105, e105] = defaultPeriodTimes(classItem?.period, "105");
+      const [s90, e90] = defaultPeriodTimes(classItem?.period, "90");
+      if (classItem?.startTime === s105 && classItem?.endTime === e105 && !(s90 === s105 && e90 === e105)) return "105";
+      return "90";
     }
 
     function periodTimeLabel(period) {
@@ -1946,8 +2024,9 @@
       if (!sourceClass) return null;
       const rawPeriod = Number(periodOverride ?? sourceClass.period);
       const period = Number.isInteger(rawPeriod) && rawPeriod >= 1 && rawPeriod <= 10 ? rawPeriod : Number(sourceClass.period || 1);
-      const [fallbackStart, fallbackEnd] = defaultPeriodTimes(period);
-      const sourceFallback = defaultPeriodTimes(sourceClass.period);
+      const mode = classDurationMode(sourceClass);
+      const [fallbackStart, fallbackEnd] = defaultPeriodTimes(period, mode);
+      const sourceFallback = defaultPeriodTimes(sourceClass.period, mode);
       const startTime = /^\d{2}:\d{2}$/.test(startOverride) ? startOverride : (fallbackStart || sourceClass.startTime || sourceFallback[0] || "09:00");
       const endTime = /^\d{2}:\d{2}$/.test(endOverride) ? endOverride : (fallbackEnd || sourceClass.endTime || sourceFallback[1] || fallbackEndTime(startTime));
       return {
@@ -2056,8 +2135,8 @@
               date,
               occurrenceDate,
               kind: "class",
-              startTime: item.startTime || defaultPeriodTimes(item.period)[0],
-              endTime: item.endTime || defaultPeriodTimes(item.period)[1]
+              startTime: item.startTime || defaultPeriodTimes(item.period, classDurationMode(item))[0],
+              endTime: item.endTime || defaultPeriodTimes(item.period, classDurationMode(item))[1]
             }))
         : [];
 
@@ -3386,16 +3465,21 @@
       renderAll();
     }
 
-    function updatePeriodTime(period, field, value) {
-      if (!state.timetableSettings.periods[period]) state.timetableSettings.periods[period] = { start: "", end: "" };
-      const previous = state.timetableSettings.periods[period][field];
-      state.timetableSettings.periods[period][field] = value;
+    function updatePeriodTime(period, field, value, mode = "90") {
+      const tableKey = mode === "105" ? "periods105" : "periods";
+      if (!state.timetableSettings[tableKey]) state.timetableSettings[tableKey] = {};
+      if (!state.timetableSettings[tableKey][period]) state.timetableSettings[tableKey][period] = { start: "", end: "" };
+      const previous = state.timetableSettings[tableKey][period][field];
+      // 変更前の長さの判定を保ったまま、該当する長さの授業だけ追従させる
+      const modes = new Map(state.classes.map(item => [item.id, classDurationMode(item)]));
+      state.timetableSettings[tableKey][period][field] = value;
       // 時限の標準時刻と同じ（または未入力の）授業だけ追従させ、個別に変えた時刻は残す。
       const timeKey = field === "start" ? "startTime" : "endTime";
       state.classes = state.classes.map(item => {
         if (Number(item.period) !== Number(period)) return item;
+        if (modes.get(item.id) !== mode) return item;
         if (item[timeKey] && item[timeKey] !== previous) return item;
-        return { ...item, [timeKey]: value };
+        return { ...item, [timeKey]: value, durationMode: mode };
       });
       renderAll();
     }
@@ -5056,7 +5140,7 @@
       const now = nowMinutes();
       const count = state.timetableSettings.periodCount;
       const days = [1, 2, 3, 4, 5];
-      const heads = `<div></div>` + days.map(day => `<div class="tt-head ${day === todayWd ? "today" : ""}">${weekdayNameFromIndex(day)}</div>`).join("");
+      const heads = `<div class="tt-corner">90分</div>` + days.map(day => `<div class="tt-head ${day === todayWd ? "today" : ""}">${weekdayNameFromIndex(day)}</div>`).join("");
       let rows = "";
       for (let period = 1; period <= count; period += 1) {
         const [start, end] = defaultPeriodTimes(period);
@@ -5075,12 +5159,24 @@
             <span class="tt-card" style="--tint:${tint};--bar:${strongColor(tint)}">
               <span class="t">${escapeHtml(cls.title || "無題")}</span>
               <span class="r">${escapeHtml(cls.room || "")}${cls.repeatMode === "biweekly" ? "・隔週" : ""}</span>
+              ${classDurationMode(cls) === "105" ? `<span class="tt-len">105分</span>` : ""}
             </span></button>`;
         }).join("");
       }
       const hidden = state.classes.filter(item => Number(item.period) > count);
+      const needsSetup = state.timetables.some(timetableUsesOld105Defaults);
+      const setupCard = needsSetup ? `
+        <div class="notice-card">${icon("clock")}<div>
+          <div><strong>90分授業と105分授業に対応しました</strong></div>
+          <div>今の時刻表は、以前の初期値（105分授業の時刻）のままです。東大の90分授業の時刻（1限 8:30〜10:00 など）に切り替えますか？ 105分の授業は、授業ごとにあとから選べます。</div>
+          <div class="notice-actions">
+            <button type="button" class="button primary" data-action="utokyo-times" data-choice="all">授業も90分に合わせる</button>
+            <button type="button" class="button" data-action="utokyo-times" data-choice="table">時刻表だけ切り替える（授業は105分のまま）</button>
+            <button type="button" class="button" data-action="utokyo-times" data-choice="keep">変更しない</button>
+          </div></div></div>` : "";
       const override = isDayTimetableOverrideActive(today) ? "：" + dayTimetableOverrideSummary(today) : "";
       $("#timetableBody").innerHTML = `
+        ${setupCard}
         <div class="tt-grid" style="--tt-days:5">${heads}${rows}</div>
         ${hidden.length ? `<p class="hint tt-note">${count + 1}限以降の授業 ${hidden.length}件は表示していません。「時間割の管理」で時限数を増やすと表示されます。</p>` : ""}
         <div class="agenda-actions" style="margin-top:12px">
@@ -5888,13 +5984,25 @@
 
     // ---- 授業シート -------------------------------------------------------
     let classSheetColorKey = "blue";
+    let classSheetDuration = "90";
+
+    function setClassDuration(mode, syncTimes) {
+      classSheetDuration = mode === "105" ? "105" : "90";
+      $$("#classDuration [data-duration]").forEach(button => button.classList.toggle("active", button.dataset.duration === classSheetDuration));
+      renderClassPeriodOptions(Number($("#classPeriod").value) || 1);
+      if (syncTimes) {
+        const [s, e] = defaultPeriodTimes(Number($("#classPeriod").value), classSheetDuration);
+        $("#classStartTime").value = s;
+        $("#classEndTime").value = e;
+      }
+    }
 
     function renderClassPeriodOptions(selected) {
       const count = state.timetableSettings.periodCount;
       const max = Math.max(count, Number(selected) || 1);
       $("#classPeriod").innerHTML = Array.from({ length: max }, (_, i) => {
         const period = i + 1;
-        const [s, e] = defaultPeriodTimes(period);
+        const [s, e] = defaultPeriodTimes(period, classSheetDuration);
         return `<option value="${period}">${period}限${s ? `（${s}〜${e}）` : ""}${period > count ? "（非表示の時限）" : ""}</option>`;
       }).join("");
       $("#classPeriod").value = String(selected || 1);
@@ -5914,6 +6022,8 @@
       $("#classEditorId").value = item ? item.id : "";
       $("#classSheetTitle").textContent = item ? (item.title || "授業") : `${weekdayNameFromIndex(day)}曜${period}限に授業を追加`;
       const p = item ? Number(item.period) : period;
+      classSheetDuration = item ? classDurationMode(item) : "90";
+      $$("#classDuration [data-duration]").forEach(button => button.classList.toggle("active", button.dataset.duration === classSheetDuration));
       renderClassPeriodOptions(p);
       $("#classDay").value = String(item ? item.day : day);
       $("#classTitle").value = item ? (item.title || "") : "";
@@ -5921,7 +6031,7 @@
       $("#classRoom").value = item ? (item.room || "") : "";
       $("#classStartDate").value = item ? (item.startDate || "") : "";
       $("#classRepeatMode").value = item && item.repeatMode === "biweekly" ? "biweekly" : "weekly";
-      const [s, e] = defaultPeriodTimes(p);
+      const [s, e] = defaultPeriodTimes(p, classSheetDuration);
       $("#classStartTime").value = item ? (item.startTime || s) : s;
       $("#classEndTime").value = item ? (item.endTime || e) : e;
       renderClassColorGrid(item ? item.colorKey : "blue");
@@ -5955,8 +6065,9 @@
         room: $("#classRoom").value.trim(),
         startDate: rawStartDate ? nextDateForWeekday(rawStartDate, day) : "",
         repeatMode,
-        startTime: $("#classStartTime").value || defaultPeriodTimes(period)[0],
-        endTime: $("#classEndTime").value || defaultPeriodTimes(period)[1],
+        startTime: $("#classStartTime").value || defaultPeriodTimes(period, classSheetDuration)[0],
+        endTime: $("#classEndTime").value || defaultPeriodTimes(period, classSheetDuration)[1],
+        durationMode: classSheetDuration,
         colorKey: classSheetColorKey || "blue"
       };
       const occupant = state.classes.find(item => item.id !== id && Number(item.day) === day && Number(item.period) === period) || null;
@@ -5970,8 +6081,9 @@
             buttons: [{ label: "キャンセル", value: null }, { label: "入れ替える", value: "swap", style: "primary" }]
           });
           if (answer !== "swap") return;
-          const [oldStart, oldEnd] = defaultPeriodTimes(original.period);
-          const [occStart, occEnd] = defaultPeriodTimes(occupant.period);
+          const occMode = classDurationMode(occupant);
+          const [oldStart, oldEnd] = defaultPeriodTimes(original.period, occMode);
+          const [occStart, occEnd] = defaultPeriodTimes(occupant.period, occMode);
           occupantUpdate = {
             ...occupant,
             day: Number(original.day),
@@ -6046,18 +6158,70 @@
       openItemSheet({ kind: "todo", date: cls ? nextClassDate(cls.id) : todayString(), childId: category?.childId || "" });
     }
 
+    // ---- 90分・105分への切り替え（旧版の初期値のままの時刻表を東大の時刻に合わせる）
+    function timetableUsesOld105Defaults(timetable) {
+      const settings = timetable.timetableSettings;
+      if (!settings || settings.lengthSetupDone) return false;
+      const upto = Math.min(6, settings.periodCount);
+      for (let i = 1; i <= upto; i += 1) {
+        const p = settings.periods?.[i];
+        if (!p || p.start !== UTOKYO_PERIODS_105[i][0] || p.end !== UTOKYO_PERIODS_105[i][1]) return false;
+      }
+      return true;
+    }
+
+    function applyUtokyoPeriodTimes(choice) {
+      persistActiveTimetableAliases();
+      const snapshot = clone(state.timetables);
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw && choice !== "keep") backupRawToIdb(raw, "90分・105分の切り替え前の自動退避", "safety").catch(() => {});
+      let changedClasses = 0;
+      state.timetables.forEach(timetable => {
+        const settings = timetable.timetableSettings;
+        if (!settings || settings.lengthSetupDone) return;
+        if (choice !== "keep" && timetableUsesOld105Defaults(timetable)) {
+          for (let i = 1; i <= 6; i += 1) {
+            settings.periods[i] = { start: UTOKYO_PERIODS_90[i][0], end: UTOKYO_PERIODS_90[i][1] };
+            settings.periods105[i] = { start: UTOKYO_PERIODS_105[i][0], end: UTOKYO_PERIODS_105[i][1] };
+          }
+          timetable.classes = timetable.classes.map(item => {
+            const p = Number(item.period);
+            const old = UTOKYO_PERIODS_105[p];
+            if (!old) return item;
+            const matches = (!item.startTime || item.startTime === old[0]) && (!item.endTime || item.endTime === old[1]);
+            if (!matches) return item;
+            changedClasses += 1;
+            if (choice === "all") return { ...item, startTime: UTOKYO_PERIODS_90[p][0], endTime: UTOKYO_PERIODS_90[p][1], durationMode: "90" };
+            return { ...item, durationMode: "105" };
+          });
+        }
+        settings.lengthSetupDone = true;
+      });
+      syncActiveTimetableAliases();
+      renderAll();
+      const message = choice === "all" ? `時刻表を90分授業に合わせ、授業${changedClasses}件を90分にしました`
+        : choice === "table" ? `時刻表を90分授業に合わせました（授業${changedClasses}件は105分のまま）` : "今の時刻表のまま使います";
+      showToast(message, () => {
+        state.timetables = snapshot;
+        syncActiveTimetableAliases();
+        renderAll();
+      }, 8000);
+    }
+
     // ---- 時間割の管理 -----------------------------------------------------
     function renderTimetableManage() {
       const active = activeTimetable();
       $("#timetableNameInput").value = active.name || "時間割";
       $("#deleteTimetable").disabled = state.timetables.length <= 1;
       $("#periodCount").value = state.timetableSettings.periodCount;
-      $("#periodTimeSettings").innerHTML = Array.from({ length: state.timetableSettings.periodCount }, (_, i) => {
+      $("#periodTimeSettings").innerHTML = `<div class="period-time-head"><span></span><span>開始</span><span>終了</span></div>` + Array.from({ length: state.timetableSettings.periodCount }, (_, i) => {
         const period = i + 1;
-        const [start, end] = defaultPeriodTimes(period);
-        return `<div class="period-time-row"><span>${period}限</span>
-          <input type="time" value="${escapeHtml(start)}" data-period-time="start" data-period="${period}" aria-label="${period}限の開始" />
-          <input type="time" value="${escapeHtml(end)}" data-period-time="end" data-period="${period}" aria-label="${period}限の終了" /></div>`;
+        return ["90", "105"].map(mode => {
+          const [start, end] = defaultPeriodTimes(period, mode);
+          return `<div class="period-time-row ${mode === "105" ? "sub" : ""}"><span>${mode === "90" ? period + "限" : ""}<small>${mode}分</small></span>
+            <input type="time" value="${escapeHtml(start)}" data-period-time="start" data-period="${period}" data-period-mode="${mode}" aria-label="${period}限（${mode}分）の開始" />
+            <input type="time" value="${escapeHtml(end)}" data-period-time="end" data-period="${period}" data-period-mode="${mode}" aria-label="${period}限（${mode}分）の終了" /></div>`;
+        }).join("");
       }).join("");
     }
 
@@ -6211,7 +6375,7 @@
       const period = Math.min(Number(source.period || 1), state.timetableSettings.periodCount);
       renderOverridePicker();
       $("#overrideMakeupPeriod").value = String(period);
-      const [s, e] = defaultPeriodTimes(period);
+      const [s, e] = defaultPeriodTimes(period, classDurationMode(source));
       $("#overrideMakeupStart").value = source.startTime || s || "";
       $("#overrideMakeupEnd").value = source.endTime || e || "";
     }
@@ -6626,6 +6790,7 @@
         case "backup-download": downloadBackup(id); break;
         case "backup-restore": restoreBackup(id); break;
         case "export-now": exportData(); break;
+        case "utokyo-times": applyUtokyoPeriodTimes(target.dataset.choice); break;
         case "snooze-reminder":
           writeUiPrefs({ reminderSnoozeUntil: new Date(Date.now() + 3 * 86400000).toISOString() });
           rerenderCurrentView();
@@ -6822,7 +6987,7 @@
       $("#periodTimeSettings").addEventListener("change", event => {
         const input = event.target.closest("[data-period-time]");
         if (!input) return;
-        updatePeriodTime(Number(input.dataset.period), input.dataset.periodTime, input.value);
+        updatePeriodTime(Number(input.dataset.period), input.dataset.periodTime, input.value, input.dataset.periodMode || "90");
       });
 
       // 追加・編集シート
@@ -6902,9 +7067,13 @@
         if (button) renderClassColorGrid(button.dataset.classColorKey);
       });
       $("#classPeriod").addEventListener("change", () => {
-        const [s, e] = defaultPeriodTimes(Number($("#classPeriod").value));
+        const [s, e] = defaultPeriodTimes(Number($("#classPeriod").value), classSheetDuration);
         $("#classStartTime").value = s;
         $("#classEndTime").value = e;
+      });
+      $("#classDuration").addEventListener("click", event => {
+        const button = event.target.closest("[data-duration]");
+        if (button) setClassDuration(button.dataset.duration, true);
       });
       $("#saveClass").addEventListener("click", saveClassSheet);
       $("#deleteClass").addEventListener("click", deleteClassFromSheet);
@@ -6922,7 +7091,8 @@
         if (button) pickOverrideClass(button.dataset.makeupPick);
       });
       $("#overrideMakeupPeriod").addEventListener("change", () => {
-        const [s, e] = defaultPeriodTimes(Number($("#overrideMakeupPeriod").value));
+        const source = state.classes.find(item => item.id === overridePickId);
+        const [s, e] = defaultPeriodTimes(Number($("#overrideMakeupPeriod").value), source ? classDurationMode(source) : "90");
         $("#overrideMakeupStart").value = s || "";
         $("#overrideMakeupEnd").value = e || "";
       });
@@ -6938,7 +7108,9 @@
       $("#saveMakeupEdit").addEventListener("click", saveMakeupSheet);
       $("#deleteMakeupEdit").addEventListener("click", deleteMakeupSheet);
       $("#makeupEditPeriod").addEventListener("change", () => {
-        const [s, e] = defaultPeriodTimes(Number($("#makeupEditPeriod").value));
+        const found = findMakeupExtraClassForDate($("#makeupEditDate").value, $("#makeupEditId").value);
+        const source = found?.item.sourceClassId ? state.classes.find(item => item.id === found.item.sourceClassId) : null;
+        const [s, e] = defaultPeriodTimes(Number($("#makeupEditPeriod").value), source ? classDurationMode(source) : "90");
         if (s) $("#makeupEditStartTime").value = s;
         if (e) $("#makeupEditEndTime").value = e;
       });
