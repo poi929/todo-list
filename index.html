@@ -803,6 +803,9 @@
     .period-time-row.sub { margin-top: -2px; margin-bottom: 6px; }
     .period-time-row.sub input { background: var(--surface-2); }
     .notice-card .notice-actions .button { white-space: normal; text-align: left; }
+
+    /* タイムラインが上端・下端に達したら、ページ全体のスクロールに引き継ぐ（終日の予定やTodoへ戻れるように） */
+    .timeline-scroll { overscroll-behavior-y: auto; }
   </style>
 </head>
 <body>
@@ -1358,7 +1361,7 @@
   </div>
 
   <script>
-    const APP_VERSION = "v106";
+    const APP_VERSION = "v107";
     // 保存キーは変更しない。旧版の removeOldStorageKeys() は「todo-calendar-board-v数字」の
     // 自分以外のキーを削除するため、キー名を変えると旧版へ戻した時に新データが消える。
     const STORAGE_KEY = "todo-calendar-board-v96";
@@ -6745,6 +6748,7 @@
           state.calendarMode = "day";
           uiOpenSections.dayTodos = null;
           navigateFast("calendar");
+          window.scrollTo({ top: 0, behavior: "instant" });
           break;
         case "month-select":
           state.selectedDate = date;
@@ -6927,6 +6931,7 @@
           state.weekScheduleCursor = state.selectedDate;
         }
         navigateFast("calendar");
+        window.scrollTo({ top: 0, behavior: "instant" });
       }));
       $("#calPrev").addEventListener("click", () => shiftCalendar(-1));
       $("#calNext").addEventListener("click", () => shiftCalendar(1));
