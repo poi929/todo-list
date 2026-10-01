@@ -802,6 +802,28 @@
       .m-bar .m-time { display: inline; }
     }
 
+    /* 月全体を表示領域に収め、予定の表示段数も高さに合わせる（v109）。 */
+    .month-grid {
+      display: grid; height: var(--month-height);
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: auto repeat(var(--weeks), minmax(0, 1fr));
+    }
+    .month-week {
+      min-height: 0; overflow: hidden;
+      grid-template-rows: var(--month-header) repeat(var(--lanes), var(--month-lane-height)) minmax(0, 1fr);
+    }
+    .month-week .month-cell { gap: 0; overflow: hidden; }
+    .month-week .month-num { flex-shrink: 0; }
+    .month-grid.compact .month-holiday { display: none; }
+    .month-grid.tiny .month-week .month-num { height: 18px; min-width: 18px; font-size: 11px; }
+    .month-grid.tiny .m-more { position: absolute; bottom: 0; right: 2px; font-size: 8px; line-height: 10px; }
+    @media (max-height: 500px) {
+      .month-calendar .calendar-toolbar { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; }
+      .month-calendar .period-title { font-size: 13px; }
+      .month-calendar .fab { top: calc(6px + var(--safe-t)); bottom: auto; right: 56px; width: 36px; height: 36px; border-radius: 12px; }
+      .month-calendar .top-title { padding-right: 40px; }
+    }
+
     /* ===== 90分・105分（v106） ===== */
     .tt-len { align-self: flex-start; margin-top: auto; padding: 0 5px; border-radius: 4px; background: rgba(17, 24, 39, .72); color: #fff; font-size: 9.5px; font-weight: 700; line-height: 15px; }
     .tt-corner { display: grid; place-items: center; font-size: 9.5px; color: var(--faint); }
@@ -1369,7 +1391,7 @@
   </div>
 
   <script>
-    const APP_VERSION = "v108";
+    const APP_VERSION = "v109";
     // 保存キーは変更しない。旧版の removeOldStorageKeys() は「todo-calendar-board-v数字」の
     // 自分以外のキーを削除するため、キー名を変えると旧版へ戻した時に新データが消える。
     const STORAGE_KEY = "todo-calendar-board-v96";
@@ -4347,7 +4369,7 @@
         case "today": return [base, bucket, narrow, uiOpenSections.todayOverdueAll].join("|");
         case "calendar":
           return [base, state.calendarMode, state.selectedDate, state.weekScheduleCursor, firstDateOfMonth(state.monthCursor || todayString()), narrow,
-            bucket, uiOpenSections.dayTodos].join("|");
+            bucket, uiOpenSections.dayTodos, state.calendarMode === "month" ? window.innerWidth + "x" + window.innerHeight : ""].join("|");
         case "todos":
           return [base, state.todoMode, state.boardStart, state.filterParentId, state.filterChildId, state.filterKind, state.categorySearchQuery,
             JSON.stringify(uiOpenSections), todoDoneLimit, narrow].join("|");
@@ -4389,6 +4411,7 @@
       $("#topTitle").textContent = VIEW_TITLES[view] || "";
       $("#topBack").hidden = !SUB_VIEW_PARENT[view];
       $(".top-settings").hidden = tabView === "more";
+      document.body.classList.toggle("month-calendar", view === "calendar" && state.calendarMode === "month");
       $("#fab").hidden = !["today", "calendar", "todos"].includes(view);
       if ($("#fab").hidden) closeFabMenu();
     }
@@ -4770,9 +4793,9 @@
     function calendarPaneKey(mode) {
       const base = dataVersion + "|" + todayString() + "|" + (window.innerWidth < 720 ? "n" : "w");
       const bucket = Math.floor(Date.now() / (5 * 60 * 1000));
-      if (mode === "day") return [base, state.selectedDate, bucket, uiOpenSections.dayTodos].join("|");
+      if (mode === "day") return [base, state.selectedDate, bucket, uiOpenSections.dayTodos, state.calendarMode === "month" ? window.innerWidth + "x" + window.innerHeight : ""].join("|");
       if (mode === "week") return [base, currentWeekScheduleStart(), bucket].join("|");
-      return [base, firstDateOfMonth(state.monthCursor || todayString()), state.selectedDate].join("|");
+      return [base, firstDateOfMonth(state.monthCursor || todayString()), state.selectedDate, window.innerWidth, window.innerHeight].join("|");
     }
 
     function renderCalendar() {
@@ -5046,7 +5069,9 @@
     function renderCalendarMonth(cursor) {
       const first = toDate(cursor);
       const start = new Date(first.getFullYear(), first.getMonth(), 1 - first.getDay(), 12);
-      const cells = Array.from({ length: 42 }, (_, i) => {
+      const daysInMonth = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+      const weeks = Math.ceil((first.getDay() + daysInMonth) / 7);
+      const cells = Array.from({ length: weeks * 7 }, (_, i) => {
         const d = new Date(start);
         d.setDate(start.getDate() + i);
         return toDateString(d);
@@ -5054,11 +5079,25 @@
       const today = todayString();
       const selected = state.selectedDate;
       const narrow = window.innerWidth < 720;
-      const maxLanes = narrow ? 4 : 5;
+      // 下部ナビゲーションと追加ボタンより上に月全体を収める。
+      // スクロール位置ではなく、文書内での本来の上端を使う。
+      const bodyTop = $("#calendarBody").getBoundingClientRect().top + window.scrollY;
+      const bottomNav = window.innerWidth < 960 ? $(".tabbar").getBoundingClientRect().height : 0;
+      const fab = $("#fab").getBoundingClientRect();
+      const bottomSpace = fab.bottom <= bodyTop ? bottomNav + 12
+        : Math.max(bottomNav + 12, window.innerHeight - fab.top + 8);
+      const monthHeight = Math.max(weeks * 22 + 30, Math.floor(window.innerHeight - bodyTop - bottomSpace));
+      const rowHeight = (monthHeight - 32 - 2) / weeks;
+      const compact = rowHeight < 54;
+      const tiny = rowHeight < 36;
+      const headerHeight = tiny ? 20 : compact ? 26 : narrow ? 38 : 42;
+      const laneHeight = narrow ? 18 : 20;
+      const maxLanes = Math.max(0, Math.min(narrow ? 4 : 5,
+        Math.floor((rowHeight - headerHeight - 18) / (laneHeight + 2))));
       const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
       const head = `<div class="month-head">${weekdays.map((w, i) => `<div class="month-weekday ${i === 0 ? "sun" : i === 6 ? "sat" : ""}">${w}</div>`).join("")}</div>`;
       let body = "";
-      for (let w = 0; w < 6; w += 1) {
+      for (let w = 0; w < weeks; w += 1) {
         const dates = cells.slice(w * 7, w * 7 + 7);
         const { placed, hidden } = monthWeekLayout(dates, maxLanes);
         const dayCells = dates.map((date, col) => {
@@ -5086,7 +5125,7 @@
         : emptyHtml("予定もTodoもありません。", selected, ["todo", "event"]);
       const selectedHoliday = japaneseHolidayName(selected);
       calendarPane(state.calendarMode).innerHTML = `
-        <div class="month-grid">${head}${body}</div>
+        <div class="month-grid ${compact ? "compact" : ""} ${tiny ? "tiny" : ""}" style="--weeks:${weeks};--month-height:${monthHeight}px;--month-header:${headerHeight}px;--month-lane-height:${laneHeight}px">${head}${body}</div>
         <div class="month-agenda">
           <div class="section-head">
             <h2 class="section-title" style="font-size:15px;color:var(--text)">${escapeHtml(longDateLabel(selected))}${selectedHoliday ? ` <span style="color:#c0392b">${escapeHtml(selectedHoliday)}</span>` : ""}</h2>
@@ -6898,9 +6937,16 @@
           window.scrollTo({ top: 0, behavior: "instant" });
           break;
         case "month-select":
-          state.selectedDate = date;
-          if (firstDateOfMonth(date) !== firstDateOfMonth(state.monthCursor)) state.monthCursor = date;
-          navigateFast("calendar");
+          if (date === state.selectedDate) {
+            state.calendarMode = "day";
+            uiOpenSections.dayTodos = null;
+            navigateFast("calendar");
+            window.scrollTo({ top: 0, behavior: "instant" });
+          } else {
+            state.selectedDate = date;
+            if (firstDateOfMonth(date) !== firstDateOfMonth(state.monthCursor)) state.monthCursor = date;
+            navigateFast("calendar");
+          }
           break;
         case "timeline-tap":
           if (event.target === target && window.innerWidth >= 720 && state.calendarMode === "week") {
