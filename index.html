@@ -812,16 +812,28 @@
       min-height: 0; overflow: hidden;
       grid-template-rows: var(--month-header) repeat(var(--lanes), var(--month-lane-height)) minmax(0, 1fr);
     }
+    .month-week { row-gap: 1px; padding-bottom: 1px; }
     .month-week .month-cell { gap: 0; overflow: hidden; }
-    .month-week .month-num { flex-shrink: 0; }
-    .month-grid.compact .month-holiday { display: none; }
-    .month-grid.tiny .month-week .month-num { height: 18px; min-width: 18px; font-size: 11px; }
-    .month-grid.tiny .m-more { position: absolute; bottom: 0; right: 2px; font-size: 8px; line-height: 10px; }
+    .month-grid .month-week .month-num {
+      flex-shrink: 0; height: var(--month-num-height); line-height: 1; font-size: min(12.5px, var(--month-num-height));
+    }
+    .month-grid .month-holiday { line-height: var(--month-holiday-height); font-size: 8.5px; margin-top: 0; }
+    .month-grid .m-bar {
+      height: var(--month-lane-height); line-height: var(--month-lane-height);
+      font-size: var(--month-bar-font); align-self: start;
+    }
+    .month-grid .m-more { font-size: 9px; line-height: 9px; align-self: start; }
+    /* 追加ボタンを上部へ移し、月の下段まで表示に使う。 */
+    .month-calendar .fab {
+      top: calc(6px + var(--safe-t)); bottom: auto; right: 56px;
+      width: 36px; height: 36px; border-radius: 12px;
+    }
+    .month-calendar .fab .icon { width: 24px; height: 24px; }
+    .month-calendar .top-title { padding-right: 40px; }
+    .month-calendar .fab-menu { top: calc(var(--topbar-h) + var(--safe-t) + 8px); bottom: auto; }
     @media (max-height: 500px) {
       .month-calendar .calendar-toolbar { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; }
       .month-calendar .period-title { font-size: 13px; }
-      .month-calendar .fab { top: calc(6px + var(--safe-t)); bottom: auto; right: 56px; width: 36px; height: 36px; border-radius: 12px; }
-      .month-calendar .top-title { padding-right: 40px; }
     }
 
     /* ===== 90分・105分（v106） ===== */
@@ -1391,7 +1403,7 @@
   </div>
 
   <script>
-    const APP_VERSION = "v109";
+    const APP_VERSION = "v110";
     // 保存キーは変更しない。旧版の removeOldStorageKeys() は「todo-calendar-board-v数字」の
     // 自分以外のキーを削除するため、キー名を変えると旧版へ戻した時に新データが消える。
     const STORAGE_KEY = "todo-calendar-board-v96";
@@ -5086,14 +5098,19 @@
       const fab = $("#fab").getBoundingClientRect();
       const bottomSpace = fab.bottom <= bodyTop ? bottomNav + 12
         : Math.max(bottomNav + 12, window.innerHeight - fab.top + 8);
-      const monthHeight = Math.max(weeks * 22 + 30, Math.floor(window.innerHeight - bodyTop - bottomSpace));
+      const monthHeight = Math.max(weeks * 60 + 34, Math.floor(window.innerHeight - bodyTop - bottomSpace));
       const rowHeight = (monthHeight - 32 - 2) / weeks;
-      const compact = rowHeight < 54;
-      const tiny = rowHeight < 36;
-      const headerHeight = tiny ? 20 : compact ? 26 : narrow ? 38 : 42;
-      const laneHeight = narrow ? 18 : 20;
-      const maxLanes = Math.max(0, Math.min(narrow ? 4 : 5,
-        Math.floor((rowHeight - headerHeight - 18) / (laneHeight + 2))));
+      // 各日に最低2段を確保する。余裕があれば表示段数を増やす。
+      // 日付・祝日・予定帯を行の高さに合わせ、固定高の帯が重ならないようにする。
+      const headerHeight = rowHeight >= 80 ? (narrow ? 34 : 38) : rowHeight >= 68 ? 28 : 22;
+      const numHeight = headerHeight - 12;
+      const holidayHeight = 10;
+      const normalLaneHeight = narrow ? 18 : 20;
+      const maxLanes = Math.max(2, Math.min(narrow ? 4 : 5,
+        Math.floor((rowHeight - headerHeight - 12) / (normalLaneHeight + 1))));
+      const laneHeight = Math.max(1, Math.min(normalLaneHeight,
+        Math.floor((rowHeight - headerHeight - (maxLanes + 1) - 11) / maxLanes)));
+      const barFont = Math.min(narrow ? 11 : 12, Math.max(1, laneHeight - 2));
       const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
       const head = `<div class="month-head">${weekdays.map((w, i) => `<div class="month-weekday ${i === 0 ? "sun" : i === 6 ? "sat" : ""}">${w}</div>`).join("")}</div>`;
       let body = "";
@@ -5125,7 +5142,7 @@
         : emptyHtml("予定もTodoもありません。", selected, ["todo", "event"]);
       const selectedHoliday = japaneseHolidayName(selected);
       calendarPane(state.calendarMode).innerHTML = `
-        <div class="month-grid ${compact ? "compact" : ""} ${tiny ? "tiny" : ""}" style="--weeks:${weeks};--month-height:${monthHeight}px;--month-header:${headerHeight}px;--month-lane-height:${laneHeight}px">${head}${body}</div>
+        <div class="month-grid" style="--weeks:${weeks};--month-height:${monthHeight}px;--month-header:${headerHeight}px;--month-lane-height:${laneHeight}px;--month-num-height:${numHeight}px;--month-holiday-height:${holidayHeight}px;--month-bar-font:${barFont}px">${head}${body}</div>
         <div class="month-agenda">
           <div class="section-head">
             <h2 class="section-title" style="font-size:15px;color:var(--text)">${escapeHtml(longDateLabel(selected))}${selectedHoliday ? ` <span style="color:#c0392b">${escapeHtml(selectedHoliday)}</span>` : ""}</h2>
