@@ -817,20 +817,15 @@
     .month-grid .month-week .month-num {
       flex-shrink: 0; height: var(--month-num-height); line-height: 1; font-size: min(12.5px, var(--month-num-height));
     }
-    .month-grid .month-holiday { line-height: var(--month-holiday-height); font-size: 8.5px; margin-top: 0; }
+    .month-grid .month-week .month-cell { padding-top: 1px; }
+    .month-grid .m-bar.holiday {
+      background: #c0392b; color: #fff; pointer-events: none; cursor: default;
+    }
     .month-grid .m-bar {
       height: var(--month-lane-height); line-height: var(--month-lane-height);
       font-size: var(--month-bar-font); align-self: start;
     }
     .month-grid .m-more { font-size: 9px; line-height: 9px; align-self: start; }
-    /* 追加ボタンを上部へ移し、月の下段まで表示に使う。 */
-    .month-calendar .fab {
-      top: calc(6px + var(--safe-t)); bottom: auto; right: 56px;
-      width: 36px; height: 36px; border-radius: 12px;
-    }
-    .month-calendar .fab .icon { width: 24px; height: 24px; }
-    .month-calendar .top-title { padding-right: 40px; }
-    .month-calendar .fab-menu { top: calc(var(--topbar-h) + var(--safe-t) + 8px); bottom: auto; }
     @media (max-height: 500px) {
       .month-calendar .calendar-toolbar { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; }
       .month-calendar .period-title { font-size: 13px; }
@@ -1403,7 +1398,7 @@
   </div>
 
   <script>
-    const APP_VERSION = "v110";
+    const APP_VERSION = "v111";
     // 保存キーは変更しない。旧版の removeOldStorageKeys() は「todo-calendar-board-v数字」の
     // 自分以外のキーを削除するため、キー名を変えると旧版へ戻した時に新データが消える。
     const STORAGE_KEY = "todo-calendar-board-v96";
@@ -4995,7 +4990,7 @@
 
     // 月表示（TimeTree のように、各日に題名の帯を並べる）
     // 週ごとに「段」を割り当て、複数日の予定は日をまたぐ1本の帯にする。
-    function monthWeekLayout(dates, maxLanes) {
+    function monthWeekLayout(dates, maxLanes, holidays = []) {
       const firstDate = dates[0];
       const lastDate = dates[6];
       const groups = new Map();
@@ -5038,6 +5033,8 @@
         return timeA.localeCompare(timeB) || importanceRank(b.todo.importance) - importanceRank(a.todo.importance);
       });
       const lanes = [];
+      // 祝日のある列だけ先頭段を使う。ほかの日には空の祝日段を設けない。
+      if (holidays.some(Boolean)) lanes[0] = holidays.map(Boolean);
       const hidden = [0, 0, 0, 0, 0, 0, 0];
       const placed = [];
       items.forEach(item => {
@@ -5100,23 +5097,30 @@
         : Math.max(bottomNav + 12, window.innerHeight - fab.top + 8);
       const monthHeight = Math.max(weeks * 60 + 34, Math.floor(window.innerHeight - bodyTop - bottomSpace));
       const rowHeight = (monthHeight - 32 - 2) / weeks;
-      // 各日に最低2段を確保する。余裕があれば表示段数を増やす。
-      // 日付・祝日・予定帯を行の高さに合わせ、固定高の帯が重ならないようにする。
-      const headerHeight = rowHeight >= 80 ? (narrow ? 34 : 38) : rowHeight >= 68 ? 28 : 22;
-      const numHeight = headerHeight - 12;
-      const holidayHeight = 10;
+      // 日付だけの高さとし、祝日専用の空白は設けない。
+      // 祝日がある日は先頭の帯に祝日を置き、予定・Todoも最低2段確保する。
+      const hasHoliday = cells.some(date => Boolean(japaneseHolidayName(date)));
+      const holidayExtra = hasHoliday ? 1 : 0;
+      const headerHeight = narrow ? 16 : 20;
+      const numHeight = headerHeight - 2;
       const normalLaneHeight = narrow ? 18 : 20;
       const maxLanes = Math.max(2, Math.min(narrow ? 4 : 5,
-        Math.floor((rowHeight - headerHeight - 12) / (normalLaneHeight + 1))));
+        Math.floor((rowHeight - headerHeight - 12) / (normalLaneHeight + 1)) - holidayExtra));
+      const sizingLanes = maxLanes + holidayExtra;
       const laneHeight = Math.max(1, Math.min(normalLaneHeight,
-        Math.floor((rowHeight - headerHeight - (maxLanes + 1) - 11) / maxLanes)));
+        Math.floor((rowHeight - headerHeight - (sizingLanes + 1) - 11) / sizingLanes)));
       const barFont = Math.min(narrow ? 11 : 12, Math.max(1, laneHeight - 2));
       const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
       const head = `<div class="month-head">${weekdays.map((w, i) => `<div class="month-weekday ${i === 0 ? "sun" : i === 6 ? "sat" : ""}">${w}</div>`).join("")}</div>`;
       let body = "";
       for (let w = 0; w < weeks; w += 1) {
         const dates = cells.slice(w * 7, w * 7 + 7);
-        const { placed, hidden } = monthWeekLayout(dates, maxLanes);
+        const holidays = dates.map(japaneseHolidayName);
+        const weekLanes = maxLanes + (holidays.some(Boolean) ? 1 : 0);
+        const { placed, hidden } = monthWeekLayout(dates, weekLanes, holidays);
+        const holidayBars = holidays.map((name, col) => name
+          ? `<span class="m-bar holiday" style="grid-column:${col + 1};grid-row:2" title="${escapeHtml(name)}">${escapeHtml(name)}</span>`
+          : "").join("");
         const dayCells = dates.map((date, col) => {
           const d = toDate(date);
           const wd = d.getDay();
@@ -5127,10 +5131,10 @@
           const aria = `${dateLabel(date)}${holiday ? "、" + holiday : ""}、${count}件`;
           return `<button type="button" class="month-cell ${outside ? "outside" : ""} ${date === today ? "today" : ""} ${date === selected ? "selected" : ""} ${holidayClass} ${wd === 0 ? "sun" : wd === 6 ? "sat" : ""}"
             style="grid-column:${col + 1}" data-action="month-select" data-date="${escapeHtml(date)}" aria-label="${escapeHtml(aria)}" aria-pressed="${date === selected}">
-            <span class="month-num">${d.getDate()}</span>${holiday ? `<span class="month-holiday" title="${escapeHtml(holiday)}">${escapeHtml(holiday)}</span>` : ""}</button>`;
+            <span class="month-num">${d.getDate()}</span></button>`;
         }).join("");
-        const more = hidden.map((n, col) => n ? `<span class="m-more" style="grid-column:${col + 1};grid-row:${maxLanes + 2}">+${n}</span>` : "").join("");
-        body += `<div class="month-week" style="--lanes:${maxLanes}">${dayCells}${placed.map(monthBarHtml).join("")}${more}</div>`;
+        const more = hidden.map((n, col) => n ? `<span class="m-more" style="grid-column:${col + 1};grid-row:${weekLanes + 2}">+${n}</span>` : "").join("");
+        body += `<div class="month-week" style="--lanes:${weekLanes}">${dayCells}${holidayBars}${placed.map(monthBarHtml).join("")}${more}</div>`;
       }
 
       // 選んだ日の一覧
@@ -5142,7 +5146,7 @@
         : emptyHtml("予定もTodoもありません。", selected, ["todo", "event"]);
       const selectedHoliday = japaneseHolidayName(selected);
       calendarPane(state.calendarMode).innerHTML = `
-        <div class="month-grid" style="--weeks:${weeks};--month-height:${monthHeight}px;--month-header:${headerHeight}px;--month-lane-height:${laneHeight}px;--month-num-height:${numHeight}px;--month-holiday-height:${holidayHeight}px;--month-bar-font:${barFont}px">${head}${body}</div>
+        <div class="month-grid" style="--weeks:${weeks};--month-height:${monthHeight}px;--month-header:${headerHeight}px;--month-lane-height:${laneHeight}px;--month-num-height:${numHeight}px;--month-bar-font:${barFont}px">${head}${body}</div>
         <div class="month-agenda">
           <div class="section-head">
             <h2 class="section-title" style="font-size:15px;color:var(--text)">${escapeHtml(longDateLabel(selected))}${selectedHoliday ? ` <span style="color:#c0392b">${escapeHtml(selectedHoliday)}</span>` : ""}</h2>
