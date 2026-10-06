@@ -1398,7 +1398,7 @@
   </div>
 
   <script>
-    const APP_VERSION = "v111";
+    const APP_VERSION = "v112";
     // 保存キーは変更しない。旧版の removeOldStorageKeys() は「todo-calendar-board-v数字」の
     // 自分以外のキーを削除するため、キー名を変えると旧版へ戻した時に新データが消える。
     const STORAGE_KEY = "todo-calendar-board-v96";
@@ -2383,6 +2383,49 @@
       return labels[mode] + (until ? "・" + dateLabel(until) + "まで" : "・期限なし");
     }
 
+    // ---- Todoの繰り返し ---------------------------------------------------
+    // Todoは締切日を1つだけ持つ。繰り返しのTodoを完了にすると、完了した回を
+    // 完了済みとして残し、元のTodoの締切日を次の回へ進めて未完了のままにする。
+    function todoRepeatMode(todo) {
+      if ((todo.kind || "todo") !== "todo") return "none";
+      return normalizeEventRepeatMode(todo.repeatMode);
+    }
+
+    function todoRepeatUntil(todo) {
+      return normalizeRepeatUntil(todo.repeatUntil, todo.date);
+    }
+
+    function todoRepeatLabel(todo) {
+      const labels = { daily: "毎日", weekly: "毎週", biweekly: "隔週", monthly: "毎月" };
+      const mode = todoRepeatMode(todo);
+      if (mode === "none") return "なし";
+      const until = todoRepeatUntil(todo);
+      return labels[mode] + (until ? "・" + dateLabel(until) + "まで" : "・期限なし");
+    }
+
+    // 次の締切日。現在の締切日と今日のうち遅い方より後で、最初に来る回を返す
+    // （遅れて完了した場合は、過ぎた回を飛ばす）。終了日を超える場合は空文字。
+    function nextTodoDueDate(todo, today = todayString()) {
+      const mode = todoRepeatMode(todo);
+      if (mode === "none") return "";
+      const current = normalizeDateString(todo.date);
+      const base = current > today ? current : today;
+      let next = "";
+      if (mode === "monthly") {
+        // 31日などの月末の日付がずれ続けないよう、最初の締切日を基準にする
+        const anchor = isValidDateString(todo.repeatAnchor) ? todo.repeatAnchor : current;
+        for (let i = 1; i <= 1200; i += 1) {
+          const candidate = addMonthsKeepingDay(anchor, i);
+          if (candidate > base) { next = candidate; break; }
+        }
+      } else {
+        const step = mode === "daily" ? 1 : (mode === "weekly" ? 7 : 14);
+        next = dateOffset(current, (Math.floor(dateDiffSigned(current, base) / step) + 1) * step);
+      }
+      const until = todoRepeatUntil(todo);
+      return next && (!until || next <= until) ? next : "";
+    }
+
     function eventScheduleLabel(todo) {
       const base = dateRangeLabel(todo);
       return eventRepeatMode(todo) === "none" ? base : base + "・繰り返し: " + eventRepeatLabel(todo);
@@ -2675,7 +2718,7 @@
         todo.date,
         todo.endDate,
         dateRangeLabel(todo),
-        todo.kind === "event" ? eventRepeatLabel(todo) : "",
+        todo.kind === "event" ? eventRepeatLabel(todo) : (todoRepeatMode(todo) !== "none" ? todoRepeatLabel(todo) : ""),
         todo.imageData || todo.imageId ? "参考画像 画像 添付" : "",
         todo.startTime,
         todo.endTime,
@@ -2864,9 +2907,9 @@
         const certaintyId = kind === "event"
           ? (todo.certaintyId === "candidate" ? "uncertain" : (todo.certaintyId || "confirmed"))
           : "";
-        const repeatMode = kind === "event" ? normalizeEventRepeatMode(todo.repeatMode) : "none";
-        const repeatUntil = kind === "event" && repeatMode !== "none" ? normalizeRepeatUntil(todo.repeatUntil, date) : "";
-        const { minutes, ...rest } = todo;
+        const repeatMode = normalizeEventRepeatMode(todo.repeatMode);
+        const repeatUntil = repeatMode !== "none" ? normalizeRepeatUntil(todo.repeatUntil, date) : "";
+        const { minutes, repeatAnchor, ...rest } = todo;
         return {
           ...rest,
           id: String(todo.id ?? makeId("todo")),
@@ -2885,6 +2928,7 @@
           repeatUntil,
           imageData: safeImageSrc(todo.imageData),
           done: Boolean(todo.done),
+          ...(kind === "todo" && repeatMode === "monthly" && isValidDateString(repeatAnchor) ? { repeatAnchor } : {}),
           ...(Array.isArray(todo.exceptionDates) ? { exceptionDates: [...new Set(todo.exceptionDates.filter(isValidDateString))].sort() } : {}),
           ...(typeof todo.imageId === "string" && todo.imageId ? { imageId: todo.imageId } : {})
         };
@@ -3995,6 +4039,11 @@
       console.assert(activeTimetable().id === state.activeTimetableId, "active timetable should be resolved");
       console.assert(!isEventOnDate({ kind: "event", date: "2026-05-01", endDate: "2026-05-01", repeatMode: "weekly", exceptionDates: ["2026-05-08"] }, "2026-05-08"), "exception date should hide the occurrence");
       console.assert(isEventOnDate({ kind: "event", date: "2026-05-01", endDate: "2026-05-01", repeatMode: "weekly", exceptionDates: ["2026-05-08"] }, "2026-05-15"), "other occurrences should remain");
+      console.assert(nextTodoDueDate({ kind: "todo", date: "2026-05-04", repeatMode: "weekly" }, "2026-05-04") === "2026-05-11", "weekly todo should advance one week");
+      console.assert(nextTodoDueDate({ kind: "todo", date: "2026-05-04", repeatMode: "weekly" }, "2026-05-20") === "2026-05-25", "overdue weekly todo should skip past occurrences");
+      console.assert(nextTodoDueDate({ kind: "todo", date: "2026-05-08", repeatMode: "weekly" }, "2026-05-06") === "2026-05-15", "early completion should advance from the due date");
+      console.assert(nextTodoDueDate({ kind: "todo", date: "2026-02-28", repeatMode: "monthly", repeatAnchor: "2026-01-31" }, "2026-02-28") === "2026-03-31", "monthly todo should keep the anchor day");
+      console.assert(nextTodoDueDate({ kind: "todo", date: "2026-05-04", repeatMode: "daily", repeatUntil: "2026-05-04" }, "2026-05-04") === "", "todo should stop after repeat end date");
     }
 
 
@@ -4566,6 +4615,7 @@
             <div class="row-meta">
               <span class="imp" style="--dot:${dot}">${escapeHtml(level)}</span>
               ${due}
+              ${todoRepeatMode(todo) !== "none" ? `<span>${escapeHtml(todoRepeatLabel(todo).split("・")[0])}</span>` : ""}
               ${options.hideCategory ? "" : `<span>${escapeHtml(categoryLabelFor(todo))}</span>`}
             </div>
             ${detail}
@@ -5795,6 +5845,30 @@
     function toggleTodo(id) {
       const todo = state.todos.find(item => item.id === id);
       if (!todo) return;
+      // 繰り返しのTodo：完了した回を完了済みとして残し、締切日を次の回へ進める
+      const nextDue = !todo.done ? nextTodoDueDate(todo) : "";
+      if (nextDue) {
+        const before = { date: todo.date, updatedAt: todo.updatedAt, anchor: todo.repeatAnchor };
+        const record = { ...todo, id: makeId("todo"), done: true, repeatMode: "none", repeatUntil: "" };
+        delete record.repeatAnchor;
+        delete record.exceptionDates;
+        stampCreated(record);
+        if (todo.createdAt) record.createdAt = todo.createdAt;
+        markCompletion(record);
+        if (todo.repeatMode === "monthly" && !isValidDateString(todo.repeatAnchor)) todo.repeatAnchor = todo.date;
+        todo.date = nextDue;
+        stampUpdated(todo);
+        state.todos.push(record);
+        renderAll();
+        showToast(`「${todo.title}」を完了にしました。次の締切は${dateLabel(nextDue)}です`, () => {
+          state.todos = state.todos.filter(item => item !== record);
+          todo.date = before.date;
+          if (before.anchor === undefined) delete todo.repeatAnchor; else todo.repeatAnchor = before.anchor;
+          if (before.updatedAt === undefined) delete todo.updatedAt; else todo.updatedAt = before.updatedAt;
+          renderAll();
+        }, 4000);
+        return;
+      }
       const previous = { done: Boolean(todo.done), completedAt: todo.completedAt };
       todo.done = !todo.done;
       if (typeof markCompletion === "function") markCompletion(todo);
@@ -5866,7 +5940,7 @@
       $("#itemImportanceField").hidden = isEvent;
       $("#itemCertaintyField").hidden = !isEvent;
       $("#itemLocationField").hidden = !isEvent;
-      $("#itemRepeatFields").hidden = !isEvent;
+      $("#itemRepeatFields").hidden = false;
       if (isEvent) {
         const start = $("#itemDate").value || todayString();
         $("#itemEndDate").value = normalizeEndDateForStart(start, $("#itemEndDate").value || start);
@@ -5878,10 +5952,16 @@
     }
 
     function updateRepeatUntilVisibility() {
-      $("#itemRepeatUntilField").hidden = itemSheet.kind !== "event" || $("#itemRepeatMode").value === "none";
+      $("#itemRepeatUntilField").hidden = $("#itemRepeatMode").value === "none";
     }
 
     function updateSeriesNote() {
+      if (itemSheet.kind === "todo") {
+        const repeatingTodo = $("#itemRepeatMode").value !== "none";
+        $("#itemSeriesNote").hidden = !repeatingTodo;
+        $("#itemSeriesNote").textContent = "完了にすると、締切日が次の回へ進みます。完了した回は完了済みに残ります。";
+        return;
+      }
       const repeating = itemSheet.mode === "edit" && itemSheet.kind === "event" && $("#itemRepeatMode").value !== "none";
       $("#itemSeriesNote").hidden = !repeating;
       $("#itemSeriesNote").textContent = itemSheet.occurrenceStart
@@ -5934,8 +6014,8 @@
       $("#itemDeadlineTime").value = todo ? (todo.deadlineTime || "") : "";
       $("#itemStartTime").value = todo ? (todo.startTime || "") : "";
       $("#itemEndTime").value = todo ? (todo.endTime || "") : "";
-      $("#itemRepeatMode").value = todo && todo.kind === "event" ? eventRepeatMode(todo) : "none";
-      $("#itemRepeatUntil").value = todo && todo.kind === "event" ? eventRepeatUntil(todo) : "";
+      $("#itemRepeatMode").value = !todo ? "none" : (todo.kind === "event" ? eventRepeatMode(todo) : todoRepeatMode(todo));
+      $("#itemRepeatUntil").value = !todo ? "" : (todo.kind === "event" ? eventRepeatUntil(todo) : todoRepeatUntil(todo));
       $("#itemImageFile").value = "";
       setItemImage(todo ? todoImageSrc(todo) : "");
       setItemImportance(todo ? todo.importance : "中");
@@ -5943,7 +6023,7 @@
       const lastChild = readUiPrefs().lastChildId;
       const preferredChild = todo ? todo.childId : (childId || (flatCategories().some(c => c.childId === lastChild) ? lastChild : flatCategories()[0]?.childId || ""));
       renderItemCategoryOptions(preferredChild, todo ? todo.parentId : "");
-      const hasMore = Boolean(todo && (todo.detail || todo.location || todoImageSrc(todo) || (todo.kind === "event" && eventRepeatMode(todo) !== "none")));
+      const hasMore = Boolean(todo && (todo.detail || todo.location || todoImageSrc(todo) || (todo.kind === "event" ? eventRepeatMode(todo) : todoRepeatMode(todo)) !== "none"));
       $("#itemMore").open = hasMore;
       setItemKind(todo ? todo.kind : kind);
       renderQuickDates();
@@ -6004,7 +6084,7 @@
         return;
       }
       const startDate = normalizeDateString($("#itemDate").value || todayString());
-      const repeatMode = kind === "event" ? normalizeEventRepeatMode($("#itemRepeatMode").value) : "none";
+      const repeatMode = normalizeEventRepeatMode($("#itemRepeatMode").value);
       const fields = {
         kind,
         parentId,
@@ -6020,10 +6100,16 @@
         importance: kind === "event" ? "中" : itemSheet.importance,
         certaintyId: kind === "event" ? itemSheet.certaintyId : "",
         repeatMode,
-        repeatUntil: kind === "event" && repeatMode !== "none" ? normalizeRepeatUntil($("#itemRepeatUntil").value, startDate) : "",
+        repeatUntil: repeatMode !== "none" ? normalizeRepeatUntil($("#itemRepeatUntil").value, startDate) : "",
         imageData: itemSheet.imageData
       };
       const existing = itemSheet.mode === "edit" ? state.todos.find(item => item.id === itemSheet.id) : null;
+      // 毎月のTodoは、月末の日付がずれないよう最初の締切日を基準として持つ
+      if (kind === "todo" && repeatMode === "monthly") {
+        const keepAnchor = existing && existing.kind === "todo" && existing.repeatMode === "monthly"
+          && existing.date === startDate && isValidDateString(existing.repeatAnchor);
+        fields.repeatAnchor = keepAnchor ? existing.repeatAnchor : startDate;
+      }
       Object.assign(fields, await imageFieldsForSave(existing));
       if (!fields.imageId && !existing) delete fields.imageId;
       writeUiPrefs({ lastChildId: childId });
@@ -6078,6 +6164,7 @@
       if (!todo) return;
       const previous = { ...todo };
       Object.assign(todo, fields);
+      if (!fields.repeatAnchor) delete todo.repeatAnchor;
       if (!todo.imageId) delete todo.imageId;
       if (kind !== "event") todo.done = Boolean(todo.done);
       if (typeof stampUpdated === "function") stampUpdated(todo);
