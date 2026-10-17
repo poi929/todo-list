@@ -163,6 +163,11 @@
     .segmented.importance button.active[data-importance="高"] { color: #9a3412; }
     .segmented.importance button.active[data-importance="低"] { color: var(--muted); }
 
+    .repeat-weekdays { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+    .repeat-weekdays button { min-width: 0; min-height: 44px; padding: 8px 0; border: 1px solid var(--line-2); border-radius: var(--radius-sm); background: var(--surface); font-weight: 600; }
+    .repeat-weekdays button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+    .repeat-weekdays button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
     .card {
       margin-bottom: 12px; padding: 16px;
       border: 1px solid var(--line); border-radius: var(--radius);
@@ -650,6 +655,10 @@
       box-shadow: var(--shadow-3); animation: sheetUp .18s ease;
     }
     .toast button { min-height: 36px; padding: 4px 12px; border: 0; border-radius: 8px; background: rgba(255,255,255,.14); color: #c7ccff; font-weight: 700; white-space: nowrap; }
+    .toast #toastMessage { flex: 1; min-width: 0; padding: 0; background: transparent; color: inherit; font-weight: inherit; text-align: left; white-space: normal; }
+    .toast #toastMessage:disabled { opacity: 1; cursor: default; }
+    .toast #toastMessage:not(:disabled)::after { content: "タップして編集"; display: block; margin-top: 3px; color: #c7ccff; font-size: 11px; }
+    .toast.clickable { cursor: pointer; }
     .update-notice {
       position: fixed; left: 12px; right: 12px; z-index: 75; bottom: calc(var(--tabbar-h) + var(--safe-b) + 84px);
       display: flex; align-items: center; justify-content: space-between; gap: 10px;
@@ -874,6 +883,17 @@
       <main id="views">
         <!-- 今日 -->
         <section id="todayView" class="view" aria-labelledby="topTitle">
+          <div class="calendar-toolbar">
+            <div class="period-nav">
+              <button id="overviewPrev" class="icon-button" type="button" aria-label="前の日"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m14.5 6-6 6 6 6"/></svg></button>
+              <label class="period-title">
+                <span id="overviewDateTitle"></span>
+                <input id="overviewDateInput" type="date" aria-label="表示する日付" />
+              </label>
+              <button id="overviewNext" class="icon-button" type="button" aria-label="次の日"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 6 6 6-6 6"/></svg></button>
+              <button id="overviewToday" class="chip-button" type="button">今日に戻る</button>
+            </div>
+          </div>
           <div id="todayContent"></div>
         </section>
 
@@ -881,7 +901,6 @@
         <section id="calendarView" class="view">
           <div class="calendar-toolbar">
             <div class="segmented" role="tablist" aria-label="カレンダーの表示">
-              <button type="button" data-calendar-mode="day">日</button>
               <button type="button" data-calendar-mode="week">週</button>
               <button type="button" data-calendar-mode="month">月</button>
             </div>
@@ -1129,6 +1148,20 @@
               </select>
             </label>
             <label class="field" id="itemRepeatUntilField"><span class="field-label">繰り返しの終了日</span><input id="itemRepeatUntil" type="date" /></label>
+          </div>
+          <div id="itemRepeatWeekdaysField" class="field" hidden>
+            <span id="itemRepeatWeekdaysLabel" class="field-label">繰り返す曜日（複数選択可）</span>
+            <div id="itemRepeatWeekdays" class="repeat-weekdays" role="group" aria-labelledby="itemRepeatWeekdaysLabel" aria-describedby="itemRepeatWeekdaysHint itemRepeatWeekdaysError">
+              <button type="button" data-repeat-weekday="1" aria-label="月曜日" aria-pressed="false">月</button>
+              <button type="button" data-repeat-weekday="2" aria-label="火曜日" aria-pressed="false">火</button>
+              <button type="button" data-repeat-weekday="3" aria-label="水曜日" aria-pressed="false">水</button>
+              <button type="button" data-repeat-weekday="4" aria-label="木曜日" aria-pressed="false">木</button>
+              <button type="button" data-repeat-weekday="5" aria-label="金曜日" aria-pressed="false">金</button>
+              <button type="button" data-repeat-weekday="6" aria-label="土曜日" aria-pressed="false">土</button>
+              <button type="button" data-repeat-weekday="0" aria-label="日曜日" aria-pressed="false">日</button>
+            </div>
+            <p id="itemRepeatWeekdaysHint" class="hint"></p>
+            <p id="itemRepeatWeekdaysError" class="field-error" role="alert" hidden></p>
           </div>
           <div class="field">
             <span class="field-label">参考画像</span>
@@ -1388,7 +1421,7 @@
   </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite" hidden>
-    <span id="toastMessage"></span>
+    <button id="toastMessage" type="button" disabled></button>
     <button id="toastAction" type="button" hidden>元に戻す</button>
   </div>
 
@@ -1398,7 +1431,7 @@
   </div>
 
   <script>
-    const APP_VERSION = "v112";
+    const APP_VERSION = "v114";
     // 保存キーは変更しない。旧版の removeOldStorageKeys() は「todo-calendar-board-v数字」の
     // 自分以外のキーを削除するため、キー名を変えると旧版へ戻した時に新データが消える。
     const STORAGE_KEY = "todo-calendar-board-v96";
@@ -2354,6 +2387,51 @@
       return ["daily", "weekly", "biweekly", "monthly"].includes(String(value || "")) ? String(value) : "none";
     }
 
+    // 0=日曜、1=月曜、…、6=土曜。旧データは元の日付の曜日を引き継ぐ。
+    function normalizeRepeatWeekdays(value, startDate) {
+      const days = Array.isArray(value)
+        ? [...new Set(value.filter(day => Number.isInteger(day) && day >= 0 && day <= 6))]
+        : [];
+      return days.length ? days.sort((a, b) => (a + 6) % 7 - (b + 6) % 7) : [weekdayIndex(normalizeDateString(startDate))];
+    }
+
+    function repeatWeekdaysFor(todo) {
+      return normalizeRepeatWeekdays(todo.repeatWeekdays, todo.date);
+    }
+
+    // 毎週のTodoは曜日ごとに独立した項目を持ち、完了した曜日だけ翌週へ進める。
+    function splitWeeklyTodo(todo) {
+      if (todoRepeatMode(todo) !== "weekly" || todo.done) return [todo];
+      const weekdays = repeatWeekdaysFor(todo);
+      const until = todoRepeatUntil(todo);
+      const dates = weekdays.map(day => ({ day, date: nextRepeatWeekdayDate(todo.date, [day]) }))
+        .filter(item => !until || item.date <= until)
+        .sort((a, b) => a.date.localeCompare(b.date));
+      // 終了済みの旧データも消さずに保持する。
+      if (!dates.length) return [todo];
+      return dates.map((item, index) => ({ ...todo, id: index === 0 ? todo.id : makeId("todo"), date: item.date, repeatWeekdays: [item.day] }));
+    }
+
+    function nextRepeatWeekdayDate(dateString, weekdays, inclusive = true) {
+      const base = normalizeDateString(dateString);
+      const day = weekdayIndex(base);
+      const offsets = weekdays.map(target => {
+        const offset = (target - day + 7) % 7;
+        return offset === 0 && !inclusive ? 7 : offset;
+      });
+      return dateOffset(base, Math.min(...offsets));
+    }
+
+    function weeklyRepeatLabel(todo) {
+      return "毎週（" + repeatWeekdaysFor(todo).map(weekdayNameFromIndex).join("・") + "）";
+    }
+
+    function repeatFrequencyLabel(todo) {
+      const mode = normalizeEventRepeatMode(todo.repeatMode);
+      const labels = { none: "なし", daily: "毎日", weekly: "毎週", biweekly: "隔週", monthly: "毎月" };
+      return mode === "weekly" ? weeklyRepeatLabel(todo) : labels[mode];
+    }
+
     function eventRepeatMode(todo) {
       if ((todo.kind || "todo") !== "event") return "none";
       return normalizeEventRepeatMode(todo.repeatMode);
@@ -2371,16 +2449,9 @@
 
     function eventRepeatLabel(todo) {
       const mode = eventRepeatMode(todo);
-      const labels = {
-        none: "なし",
-        daily: "毎日",
-        weekly: "毎週",
-        biweekly: "隔週",
-        monthly: "毎月"
-      };
       if (mode === "none") return "なし";
       const until = eventRepeatUntil(todo);
-      return labels[mode] + (until ? "・" + dateLabel(until) + "まで" : "・期限なし");
+      return repeatFrequencyLabel(todo) + (until ? "・" + dateLabel(until) + "まで" : "・期限なし");
     }
 
     // ---- Todoの繰り返し ---------------------------------------------------
@@ -2396,11 +2467,10 @@
     }
 
     function todoRepeatLabel(todo) {
-      const labels = { daily: "毎日", weekly: "毎週", biweekly: "隔週", monthly: "毎月" };
       const mode = todoRepeatMode(todo);
       if (mode === "none") return "なし";
       const until = todoRepeatUntil(todo);
-      return labels[mode] + (until ? "・" + dateLabel(until) + "まで" : "・期限なし");
+      return repeatFrequencyLabel(todo) + (until ? "・" + dateLabel(until) + "まで" : "・期限なし");
     }
 
     // 次の締切日。現在の締切日と今日のうち遅い方より後で、最初に来る回を返す
@@ -2411,7 +2481,9 @@
       const current = normalizeDateString(todo.date);
       const base = current > today ? current : today;
       let next = "";
-      if (mode === "monthly") {
+      if (mode === "weekly") {
+        next = nextRepeatWeekdayDate(base, [weekdayIndex(current)], false);
+      } else if (mode === "monthly") {
         // 31日などの月末の日付がずれ続けないよう、最初の締切日を基準にする
         const anchor = isValidDateString(todo.repeatAnchor) ? todo.repeatAnchor : current;
         for (let i = 1; i <= 1200; i += 1) {
@@ -2419,7 +2491,7 @@
           if (candidate > base) { next = candidate; break; }
         }
       } else {
-        const step = mode === "daily" ? 1 : (mode === "weekly" ? 7 : 14);
+        const step = mode === "daily" ? 1 : 14;
         next = dateOffset(current, (Math.floor(dateDiffSigned(current, base) / step) + 1) * step);
       }
       const until = todoRepeatUntil(todo);
@@ -2497,8 +2569,19 @@
         return validOccurrence(date) || validOccurrence(minStart);
       }
 
-      if (mode === "weekly" || mode === "biweekly") {
-        const step = mode === "weekly" ? 7 : 14;
+      if (mode === "weekly") {
+        const weekdays = repeatWeekdaysFor(todo);
+        let candidate = nextRepeatWeekdayDate(minStart > start ? minStart : start, weekdays);
+        while (candidate <= date) {
+          const result = validOccurrence(candidate);
+          if (result) return result;
+          candidate = nextRepeatWeekdayDate(candidate, weekdays, false);
+        }
+        return null;
+      }
+
+      if (mode === "biweekly") {
+        const step = 14;
         const maxDiff = dateDiffDays(start, date);
         const minDiff = Math.max(0, dateDiffDays(start, minStart));
         const firstK = Math.max(0, Math.ceil(minDiff / step) - 1);
@@ -2909,7 +2992,7 @@
           : "";
         const repeatMode = normalizeEventRepeatMode(todo.repeatMode);
         const repeatUntil = repeatMode !== "none" ? normalizeRepeatUntil(todo.repeatUntil, date) : "";
-        const { minutes, repeatAnchor, ...rest } = todo;
+        const { minutes, repeatAnchor, repeatWeekdays, ...rest } = todo;
         return {
           ...rest,
           id: String(todo.id ?? makeId("todo")),
@@ -2926,6 +3009,7 @@
           certaintyId,
           repeatMode,
           repeatUntil,
+          ...(repeatMode === "weekly" ? { repeatWeekdays: normalizeRepeatWeekdays(repeatWeekdays, date) } : {}),
           imageData: safeImageSrc(todo.imageData),
           done: Boolean(todo.done),
           ...(kind === "todo" && repeatMode === "monthly" && isValidDateString(repeatAnchor) ? { repeatAnchor } : {}),
@@ -2933,6 +3017,7 @@
           ...(typeof todo.imageId === "string" && todo.imageId ? { imageId: todo.imageId } : {})
         };
       });
+      loaded.todos = loaded.todos.flatMap(splitWeeklyTodo);
       loaded.classColorPresets = mergeClassColorPresets(loaded.classColorPresets);
       hydrateTimetableState(loaded, parsed);
       loaded.selectedDate = normalizeDateString(loaded.selectedDate, todayString());
@@ -3466,12 +3551,28 @@
         if (endCompare) return endCompare;
         return String(a.todo.id || "").localeCompare(String(b.todo.id || ""));
       }
+      if (a.todo.kind !== "event" && b.todo.kind !== "event") return compareMonthTodoEntries(a, b);
       if (a.isCarryOver !== b.isCarryOver) return a.isCarryOver ? -1 : 1;
       const timeA = a.todo.kind === "event" ? (a.todo.startTime || "") : (a.todo.deadlineTime || "");
       const timeB = b.todo.kind === "event" ? (b.todo.startTime || "") : (b.todo.deadlineTime || "");
       const timeCompare = String(timeA || "").localeCompare(String(timeB || ""));
       if (timeCompare) return timeCompare;
       return importanceRank(b.todo.importance) - importanceRank(a.todo.importance);
+    }
+
+    function isRecurringTodo(todo) {
+      return todo.kind !== "event" && (todoRepeatMode(todo) !== "none" || Boolean(todo.repeatSourceId));
+    }
+
+    function isVisibleInMonth(todo) {
+      return !(todo.importance === "低" && isRecurringTodo(todo));
+    }
+
+    function compareMonthTodoEntries(a, b) {
+      return importanceRank(b.todo.importance) - importanceRank(a.todo.importance)
+        || Number(isRecurringTodo(a.todo)) - Number(isRecurringTodo(b.todo))
+        || Number(Boolean(a.todo.done)) - Number(Boolean(b.todo.done))
+        || String(a.todo.deadlineTime || "99").localeCompare(String(b.todo.deadlineTime || "99"));
     }
 
 
@@ -4315,9 +4416,14 @@
     // ---- 通知（元に戻す付き）
     let toastTimer = null;
     let toastUndo = null;
-    function showToast(message, undo = null, duration = 5000) {
+    let toastTap = null;
+    function showToast(message, undo = null, duration = 5000, onTap = null) {
       const toast = $("#toast");
       $("#toastMessage").textContent = message;
+      toastTap = typeof onTap === "function" ? onTap : null;
+      $("#toastMessage").disabled = !toastTap;
+      $("#toastMessage").setAttribute("aria-label", message + (toastTap ? "。タップして編集" : ""));
+      toast.classList.toggle("clickable", Boolean(toastTap));
       const action = $("#toastAction");
       toastUndo = typeof undo === "function" ? undo : null;
       action.hidden = !toastUndo;
@@ -4329,6 +4435,7 @@
       clearTimeout(toastTimer);
       $("#toast").hidden = true;
       toastUndo = null;
+      toastTap = null;
     }
 
     // ---- FAB
@@ -4355,6 +4462,11 @@
     // 旧版の画面名を新しい画面へ対応させる（loadState から呼ばれるため、ここでは定数を参照しない）
     function mapLegacyView(loaded) {
       const view = loaded.view;
+      if (view === "day" || (view === "calendar" && loaded.calendarMode === "day")) {
+        loaded.view = "today";
+        loaded.calendarMode = "week";
+        return;
+      }
       if (["today", "calendar", "todos", "timetable", "more", "manage", "settings", "data"].includes(view)) return;
       if (view === "matrix") {
         if (loaded.weekBoardMode === "calendar") {
@@ -4364,7 +4476,7 @@
           loaded.view = "todos";
           loaded.todoMode = "board";
         }
-      } else if (view === "month" || view === "day") {
+      } else if (view === "month") {
         loaded.view = "calendar";
         loaded.calendarMode = view;
       } else if (view === "category" || view === "completed") {
@@ -4397,11 +4509,15 @@
         }
         // しばらく使っていなかった場合は「今日」から始める。
         const savedAt = Number(nav.savedAt || 0);
-        if (!savedAt || Date.now() - savedAt > 30 * 60 * 1000) loaded.view = "today";
+        if (!savedAt || Date.now() - savedAt > 30 * 60 * 1000) {
+          loaded.view = "today";
+          loaded.selectedDate = todayString();
+        }
       } else {
         loaded.view = "today";
+        loaded.selectedDate = todayString();
       }
-      if (!["day", "week", "month"].includes(loaded.calendarMode)) loaded.calendarMode = "day";
+      if (!["week", "month"].includes(loaded.calendarMode)) loaded.calendarMode = "week";
       if (!["list", "board"].includes(loaded.todoMode)) loaded.todoMode = "list";
       if (!isValidDateString(loaded.boardStart)) loaded.boardStart = todayString();
       return loaded;
@@ -4422,7 +4538,7 @@
       const bucket = Math.floor(Date.now() / (5 * 60 * 1000));
       const narrow = window.innerWidth < 720 ? "n" : "w";
       switch (view) {
-        case "today": return [base, bucket, narrow, uiOpenSections.todayOverdueAll].join("|");
+        case "today": return [base, state.selectedDate, bucket, narrow, uiOpenSections.todayOverdueAll, state.showClassesInTimeline].join("|");
         case "calendar":
           return [base, state.calendarMode, state.selectedDate, state.weekScheduleCursor, firstDateOfMonth(state.monthCursor || todayString()), narrow,
             bucket, uiOpenSections.dayTodos, state.calendarMode === "month" ? window.innerWidth + "x" + window.innerHeight : ""].join("|");
@@ -4464,7 +4580,7 @@
         else button.removeAttribute("aria-current");
       });
       $$(".view").forEach(section => section.classList.toggle("active", section.id === view + "View"));
-      $("#topTitle").textContent = VIEW_TITLES[view] || "";
+      $("#topTitle").textContent = view === "today" && state.selectedDate !== todayString() ? "予定とTodo" : (VIEW_TITLES[view] || "");
       $("#topBack").hidden = !SUB_VIEW_PARENT[view];
       $(".top-settings").hidden = tabView === "more";
       document.body.classList.toggle("month-calendar", view === "calendar" && state.calendarMode === "month");
@@ -4563,7 +4679,18 @@
       navigateFast(entry.view || "today", { fromHistory: true });
     }
 
+    function openDailyOverview(date) {
+      state.selectedDate = normalizeDateString(date);
+      uiOpenSections.todayOverdueAll = false;
+      navigateFast("today");
+      window.scrollTo({ top: 0, behavior: "instant" });
+    }
+
     function navigateFast(view = state.view, options = {}) {
+      if (view === "calendar" && state.calendarMode === "day") {
+        state.calendarMode = "week";
+        view = "today";
+      }
       const changed = view !== state.view;
       if (changed && !options.fromHistory) syncHistoryForView(view);
       state.view = view;
@@ -4615,7 +4742,7 @@
             <div class="row-meta">
               <span class="imp" style="--dot:${dot}">${escapeHtml(level)}</span>
               ${due}
-              ${todoRepeatMode(todo) !== "none" ? `<span>${escapeHtml(todoRepeatLabel(todo).split("・")[0])}</span>` : ""}
+              ${todoRepeatMode(todo) !== "none" ? `<span>${escapeHtml(repeatFrequencyLabel(todo))}</span>` : ""}
               ${options.hideCategory ? "" : `<span>${escapeHtml(categoryLabelFor(todo))}</span>`}
             </div>
             ${detail}
@@ -4663,7 +4790,7 @@
               ${certainty}
               ${spanText}
               ${todo.location ? `<span>${escapeHtml(todo.location)}</span>` : ""}
-              ${eventRepeatMode(todo) !== "none" ? `<span>${escapeHtml(eventRepeatLabel(todo).split("・")[0])}</span>` : ""}
+              ${eventRepeatMode(todo) !== "none" ? `<span>${escapeHtml(repeatFrequencyLabel(todo))}</span>` : ""}
               ${options.showDate ? `<span>${escapeHtml(dateLabel(dateString))}</span>` : ""}
             </div>
           </div>
@@ -4719,10 +4846,14 @@
 
     // ---- 今日 -----------------------------------------------------------
     function renderToday() {
-      const today = todayString();
+      const today = normalizeDateString(state.selectedDate);
+      const isToday = today === todayString();
+      $("#overviewDateTitle").textContent = longDateLabel(today);
+      $("#overviewDateInput").value = today;
+      $("#overviewToday").classList.toggle("active", isToday);
       const now = nowMinutes();
       const index = itemIndex();
-      const overdue = index.overdue.slice().sort((a, b) => String(a.date).localeCompare(String(b.date)) || importanceRank(b.importance) - importanceRank(a.importance));
+      const overdue = isToday ? index.overdue.slice().sort((a, b) => String(a.date).localeCompare(String(b.date)) || importanceRank(b.importance) - importanceRank(a.importance)) : [];
       const todayTodos = (index.todosByDate.get(today) || []).slice()
         .sort((a, b) => Number(Boolean(a.done)) - Number(Boolean(b.done)) || String(a.deadlineTime || "99").localeCompare(String(b.deadlineTime || "99")) || importanceRank(b.importance) - importanceRank(a.importance));
       const agenda = agendaItemsForDate(today);
@@ -4732,7 +4863,7 @@
       // 次の授業（授業中なら現在の授業）
       const current = classesToday.find(item => item.start <= now && now < item.end);
       const next = classesToday.find(item => item.start > now);
-      const focus = current || next;
+      const focus = isToday ? (current || next) : null;
       let nextClassHtml = "";
       if (focus) {
         const cls = focus.item;
@@ -4757,15 +4888,15 @@
         let nowInserted = false;
         const rows = agenda.map(item => {
           let prefix = "";
-          if (!nowInserted && !item.allDay && item.start > now) {
+          if (isToday && !nowInserted && !item.allDay && item.start > now) {
             nowInserted = true;
             prefix = `<div class="now-divider"><span>いま ${escapeHtml(timeText24(now))}</span></div>`;
           }
-          return prefix + agendaRowHtml(item, today, { pastCheck: true });
+          return prefix + agendaRowHtml(item, today, { pastCheck: isToday });
         }).join("");
         agendaHtml = `<div class="rows">${rows}</div>`;
       } else {
-        agendaHtml = emptyHtml("今日の予定と授業はありません。", today, ["event"]);
+        agendaHtml = emptyHtml(isToday ? "今日の予定と授業はありません。" : "この日の予定と授業はありません。", today, ["event"]);
       }
       const override = isDayTimetableOverrideActive(today) ? `：${escapeHtml(dayTimetableOverrideSummary(today))}` : "";
 
@@ -4780,7 +4911,7 @@
 
       const summary = [
         overdue.length ? `<span class="pill danger">期限切れ <strong>${overdue.length}</strong></span>` : "",
-        `<span class="pill">今日の締切 <strong>${openToday.length}</strong></span>`,
+        `<span class="pill">${isToday ? "今日" : "この日"}の締切 <strong>${openToday.length}</strong></span>`,
         `<span class="pill">予定 <strong>${agenda.filter(item => item.type === "event").length}</strong></span>`,
         state.showClassesInTimeline ? `<span class="pill">授業 <strong>${classesToday.length}</strong></span>` : ""
       ].join("");
@@ -4790,7 +4921,6 @@
       $("#todayContent").innerHTML = `
         ${backupNotice}
         <div class="today-hero">
-          <p class="today-date">${escapeHtml(longDateLabel(today))}</p>
           <div class="today-summary">${summary}</div>
         </div>
         <div class="today-layout">
@@ -4798,19 +4928,19 @@
             ${nextClassHtml}
             <div class="section">
               <div class="section-head">
-                <h2 class="section-title">今日のスケジュール</h2>
-                <button type="button" class="link-button" data-action="open-day" data-date="${escapeHtml(today)}">タイムライン</button>
+                <h2 class="section-title">${isToday ? "今日" : "この日"}のスケジュール</h2>
               </div>
               ${agendaHtml}
               <div class="agenda-actions">
                 <button type="button" class="toggle-chip ${override ? "active" : ""}" data-action="override" data-date="${escapeHtml(today)}">${icon("swap")}<span>振替・休講・補講${override}</span></button>
+                <button type="button" class="toggle-chip ${state.showClassesInTimeline ? "active" : ""}" data-action="toggle-classes" aria-pressed="${state.showClassesInTimeline}">${icon("table")}<span>授業を表示</span></button>
               </div>
             </div>
           </div>
           <div>
             <div class="section">
-              <div class="section-head"><h2 class="section-title">今日までのTodo<span class="count">${openToday.length}</span></h2></div>
-              ${todayTodos.length ? `<div class="rows">${todayTodos.map(todo => todoRowHtml(todo, { hideDate: true })).join("")}</div>` : emptyHtml("今日が締切のTodoはありません。", today, ["todo"])}
+              <div class="section-head"><h2 class="section-title">${isToday ? "今日" : "この日"}のTodo<span class="count">${openToday.length}</span></h2></div>
+              ${todayTodos.length ? `<div class="rows">${todayTodos.map(todo => todoRowHtml(todo, { hideDate: true })).join("")}</div>` : emptyHtml(isToday ? "今日が締切のTodoはありません。" : "この日が締切のTodoはありません。", today, ["todo"])}
             </div>
             ${overdue.length ? `
               <div class="section">
@@ -4823,7 +4953,7 @@
                 <div class="section-head"><h2 class="section-title">これからの締切</h2>
                   <button type="button" class="link-button" data-action="go-todos">すべて</button></div>
                 ${upcomingGroups.map(group => `
-                  <p class="muted small" style="margin:10px 0 6px;font-weight:700">${escapeHtml(relativeDateLabel(group.date))}${dateDiffSigned(today, group.date) > 2 ? "" : "　" + escapeHtml(dateLabel(group.date))}</p>
+                  <p class="muted small" style="margin:10px 0 6px;font-weight:700">${isToday ? escapeHtml(relativeDateLabel(group.date)) + (dateDiffSigned(today, group.date) > 2 ? "" : "　" + escapeHtml(dateLabel(group.date))) : escapeHtml(dateLabel(group.date))}</p>
                   <div class="rows">${group.list.map(todo => todoRowHtml(todo, { hideDate: true, showDetail: false })).join("")}</div>`).join("")}
               </div>` : ""}
           </div>
@@ -4831,10 +4961,9 @@
     }
 
     // ---- カレンダー -------------------------------------------------------
-    const PX_PER_HOUR_DAY = 56;
     let lastTimelineScrollKey = "";
 
-    // 日・週・月の表示を別々に保持し、条件が変わっていなければ描き直さない
+    // 週・月の表示を別々に保持し、条件が変わっていなければ描き直さない
     const calendarPaneKeys = {};
     function calendarPane(mode) {
       let pane = document.getElementById("calPane-" + mode);
@@ -4863,11 +4992,7 @@
         button.setAttribute("aria-selected", String(active));
       });
       const input = $("#calDateInput");
-      if (mode === "day") {
-        $("#calTitle").textContent = `${toDate(state.selectedDate).getMonth() + 1}月${toDate(state.selectedDate).getDate()}日（${weekdayFullLabel(state.selectedDate)}）`;
-        input.value = state.selectedDate;
-        { const key = calendarPaneKey(mode); const pane = calendarPane(mode); if (calendarPaneKeys[mode] !== key || !pane.childElementCount) { renderCalendarDay(); calendarPaneKeys[mode] = key; } }
-      } else if (mode === "week") {
+      if (mode === "week") {
         const start = currentWeekScheduleStart();
         $("#calTitle").textContent = `${dateLabel(start)}〜${dateLabel(dateOffset(start, 6))}`;
         input.value = start;
@@ -4950,46 +5075,6 @@
       scrollBox.scrollTop = Math.max(0, (target - startHour * 60) / 60 * pxPerHour);
     }
 
-    function renderCalendarDay() {
-      const date = state.selectedDate;
-      const { startHour, endHour } = timelineHourRange();
-      const px = PX_PER_HOUR_DAY;
-      const todos = effectiveTodosForDate(date).filter(entry => entry.todo.kind !== "event")
-        .sort((a, b) => Number(Boolean(a.todo.done && !a.isCarryOver)) - Number(Boolean(b.todo.done && !b.isCarryOver)));
-      const agenda = agendaItemsForDate(date);
-      const allDay = agenda.filter(item => item.allDay);
-      const blocks = timelineBlocks(date, px, startHour, endHour);
-      const override = isDayTimetableOverrideActive(date) ? "：" + dayTimetableOverrideSummary(date) : "";
-      const todosOpen = uiOpenSections.dayTodos === null ? todos.length <= 4 : uiOpenSections.dayTodos;
-      const isToday = date === todayString();
-      const height = (endHour - startHour) * px;
-
-      calendarPane(state.calendarMode).innerHTML = `
-        <div class="chip-row">
-          <button type="button" class="toggle-chip ${override ? "active" : ""}" data-action="override" data-date="${escapeHtml(date)}">${icon("swap")}<span>振替・休講・補講${escapeHtml(override)}</span></button>
-          <button type="button" class="toggle-chip ${state.showClassesInTimeline ? "active" : ""}" data-action="toggle-classes" aria-pressed="${state.showClassesInTimeline}">${icon("table")}<span>授業を表示</span></button>
-        </div>
-        ${todos.length ? `
-          <div class="section">
-            <button type="button" class="section-toggle" data-action="toggle-day-todos" aria-expanded="${todosOpen}">${icon("right")}<span>この日のTodo</span><span class="count">${todos.length}</span></button>
-            ${todosOpen ? `<div class="rows">${todos.map(entry => todoRowHtml(entry.todo, { carry: entry.isCarryOver, hideDate: !entry.isCarryOver, showDetail: false })).join("")}</div>` : ""}
-          </div>` : ""}
-        ${allDay.length ? `<div class="allday">${allDayChipsHtml(allDay, date)}</div>` : ""}
-        <div class="timeline-scroll" id="dayTimelineScroll">
-          <div class="timeline" style="height:${height + 12}px;padding-top:6px">
-            <div class="tl-labels">${hourLabelsHtml(startHour, endHour, px)}</div>
-            <div class="tl-area" style="height:${height}px" data-action="timeline-tap" data-date="${escapeHtml(date)}">
-              ${hourLinesHtml(startHour, endHour, px)}
-              ${blocks.map(block => timelineBlockHtml(block, date)).join("")}
-              ${isToday ? nowLineHtml(startHour, endHour, px) : ""}
-            </div>
-          </div>
-        </div>
-        ${!agenda.length && !todos.length ? `<p class="hint" style="margin-top:10px">この日の予定・授業・Todoはありません。右下の＋から追加できます。</p>` : ""}`;
-      const first = blocks.length ? Math.min(...blocks.map(block => block.layoutStart)) : null;
-      scrollTimelineInto($("#dayTimelineScroll"), "day|" + date + (isToday ? "|today" : ""), startHour, px, first);
-    }
-
     function renderCalendarWeek(start) {
       const dates = getDateRange(start, 7);
       const { startHour, endHour } = timelineHourRange();
@@ -5046,7 +5131,7 @@
       const groups = new Map();
       dates.forEach((date, col) => {
         effectiveTodosForDate(date).forEach(entry => {
-          if (entry.isCarryOver) return;
+          if (entry.isCarryOver || !isVisibleInMonth(entry.todo)) return;
           const todo = entry.todo;
           let key = todo.id + "|" + date;
           let startCol = col;
@@ -5075,6 +5160,7 @@
         const eventA = a.todo.kind === "event" ? 0 : 1;
         const eventB = b.todo.kind === "event" ? 0 : 1;
         if (eventA !== eventB) return eventA - eventB;
+        if (eventA === 1) return compareMonthTodoEntries({ todo: a.todo }, { todo: b.todo });
         const doneA = a.todo.kind !== "event" && a.todo.done ? 1 : 0;
         const doneB = b.todo.kind !== "event" && b.todo.done ? 1 : 0;
         if (doneA !== doneB) return doneA - doneB;
@@ -5175,7 +5261,7 @@
           const d = toDate(date);
           const wd = d.getDay();
           const outside = d.getMonth() !== first.getMonth();
-          const count = effectiveTodosForDate(date).filter(entry => !entry.isCarryOver).length;
+          const count = effectiveTodosForDate(date).filter(entry => !entry.isCarryOver && isVisibleInMonth(entry.todo)).length;
           const holiday = japaneseHolidayName(date);
           const holidayClass = holiday ? "holiday" : "";
           const aria = `${dateLabel(date)}${holiday ? "、" + holiday : ""}、${count}件`;
@@ -5189,7 +5275,8 @@
 
       // 選んだ日の一覧
       const agenda = agendaItemsForDate(selected, false);
-      const todos = effectiveTodosForDate(selected).filter(entry => entry.todo.kind !== "event");
+      const todos = effectiveTodosForDate(selected).filter(entry => entry.todo.kind !== "event" && isVisibleInMonth(entry.todo))
+        .sort(compareMonthTodoEntries);
       const listHtml = agenda.length || todos.length
         ? `${agenda.length ? `<div class="rows" style="margin-bottom:10px">${agenda.map(item => agendaRowHtml(item, selected)).join("")}</div>` : ""}
            ${todos.length ? `<div class="rows">${todos.map(entry => todoRowHtml(entry.todo, { carry: entry.isCarryOver, hideDate: !entry.isCarryOver, showDetail: false })).join("")}</div>` : ""}`
@@ -5849,8 +5936,9 @@
       const nextDue = !todo.done ? nextTodoDueDate(todo) : "";
       if (nextDue) {
         const before = { date: todo.date, updatedAt: todo.updatedAt, anchor: todo.repeatAnchor };
-        const record = { ...todo, id: makeId("todo"), done: true, repeatMode: "none", repeatUntil: "" };
+        const record = { ...todo, id: makeId("todo"), done: true, repeatMode: "none", repeatUntil: "", repeatSourceId: todo.repeatSourceId || todo.id };
         delete record.repeatAnchor;
+        delete record.repeatWeekdays;
         delete record.exceptionDates;
         stampCreated(record);
         if (todo.createdAt) record.createdAt = todo.createdAt;
@@ -5893,7 +5981,7 @@
     }
 
     // ---- 追加・編集シート -------------------------------------------------
-    const itemSheet = { mode: "add", id: null, kind: "todo", importance: "中", certaintyId: "confirmed", imageData: "", occurrenceDate: "", occurrenceStart: "" };
+    const itemSheet = { mode: "add", id: null, kind: "todo", importance: "中", certaintyId: "confirmed", imageData: "", occurrenceDate: "", occurrenceStart: "", repeatWeekdaysExplicit: false };
 
     function renderItemCategoryOptions(selectedChildId, fallbackParentId = "") {
       const select = $("#itemCategory");
@@ -5953,13 +6041,39 @@
 
     function updateRepeatUntilVisibility() {
       $("#itemRepeatUntilField").hidden = $("#itemRepeatMode").value === "none";
+      $("#itemRepeatWeekdaysField").hidden = $("#itemRepeatMode").value !== "weekly";
+      if (!itemSheet.repeatWeekdaysExplicit) setItemRepeatWeekdays([weekdayIndex(normalizeDateString($("#itemDate").value))]);
+      updateRepeatWeekdaysHint();
+    }
+
+    function setItemRepeatWeekdays(days) {
+      $$("#itemRepeatWeekdays [data-repeat-weekday]").forEach(button => {
+        button.setAttribute("aria-pressed", String(days.includes(Number(button.dataset.repeatWeekday))));
+      });
+    }
+
+    function readItemRepeatWeekdays() {
+      return $$('#itemRepeatWeekdays [aria-pressed="true"]').map(button => Number(button.dataset.repeatWeekday));
+    }
+
+    function updateRepeatWeekdaysHint() {
+      $("#itemRepeatWeekdaysError").hidden = true;
+      const days = readItemRepeatWeekdays();
+      const first = days.length ? nextRepeatWeekdayDate($("#itemDate").value, days) : "";
+      $("#itemRepeatWeekdaysHint").textContent = first
+        ? (itemSheet.kind === "todo"
+          ? "曜日ごとに別のTodoを作成し、完了した曜日の分だけ翌週へ進みます。最初の締切：" + dateLabel(first)
+          : "最初の予定：" + dateLabel(first) + "。選んだ曜日に毎週繰り返します。")
+        : "繰り返す曜日を1つ以上選んでください。";
     }
 
     function updateSeriesNote() {
       if (itemSheet.kind === "todo") {
         const repeatingTodo = $("#itemRepeatMode").value !== "none";
         $("#itemSeriesNote").hidden = !repeatingTodo;
-        $("#itemSeriesNote").textContent = "完了にすると、締切日が次の回へ進みます。完了した回は完了済みに残ります。";
+        $("#itemSeriesNote").textContent = $("#itemRepeatMode").value === "weekly"
+          ? "曜日ごとに独立したTodoです。完了した曜日の分だけ翌週へ進みます。完了した回は完了済みに残ります。"
+          : "完了にすると、締切日が次の回へ進みます。完了した回は完了済みに残ります。";
         return;
       }
       const repeating = itemSheet.mode === "edit" && itemSheet.kind === "event" && $("#itemRepeatMode").value !== "none";
@@ -5987,6 +6101,7 @@
     }
 
     function defaultAddDate() {
+      if (state.view === "today") return normalizeDateString(state.selectedDate);
       if (state.view === "calendar") {
         if (state.calendarMode === "week") {
           const start = currentWeekScheduleStart();
@@ -6016,6 +6131,8 @@
       $("#itemEndTime").value = todo ? (todo.endTime || "") : "";
       $("#itemRepeatMode").value = !todo ? "none" : (todo.kind === "event" ? eventRepeatMode(todo) : todoRepeatMode(todo));
       $("#itemRepeatUntil").value = !todo ? "" : (todo.kind === "event" ? eventRepeatUntil(todo) : todoRepeatUntil(todo));
+      itemSheet.repeatWeekdaysExplicit = Boolean(todo && Array.isArray(todo.repeatWeekdays) && todo.repeatWeekdays.length);
+      setItemRepeatWeekdays(todo ? repeatWeekdaysFor(todo) : [weekdayIndex(startDate)]);
       $("#itemImageFile").value = "";
       setItemImage(todo ? todoImageSrc(todo) : "");
       setItemImportance(todo ? todo.importance : "中");
@@ -6042,6 +6159,7 @@
         }
       }
       updateSeriesNote();
+      updateRepeatWeekdaysHint();
       openSheet("itemSheet", todo ? null : "#itemTitle");
     }
 
@@ -6083,8 +6201,22 @@
         showToast("カテゴリを追加してから保存してください。");
         return;
       }
-      const startDate = normalizeDateString($("#itemDate").value || todayString());
+      let startDate = normalizeDateString($("#itemDate").value || todayString());
       const repeatMode = normalizeEventRepeatMode($("#itemRepeatMode").value);
+      const repeatWeekdays = readItemRepeatWeekdays();
+      if (repeatMode === "weekly") {
+        let error = repeatWeekdays.length ? "" : "繰り返す曜日を1つ以上選んでください。";
+        const first = repeatWeekdays.length ? nextRepeatWeekdayDate(startDate, repeatWeekdays) : "";
+        const until = $("#itemRepeatUntil").value;
+        if (first && isValidDateString(until) && first > until) error = "終了日までに選択した曜日がありません。終了日か曜日を変更してください。";
+        if (error) {
+          $("#itemRepeatWeekdaysError").textContent = error;
+          $("#itemRepeatWeekdaysError").hidden = false;
+          $("#itemRepeatWeekdays [data-repeat-weekday]").focus();
+          return;
+        }
+        if (kind === "todo") startDate = first;
+      }
       const fields = {
         kind,
         parentId,
@@ -6100,6 +6232,7 @@
         importance: kind === "event" ? "中" : itemSheet.importance,
         certaintyId: kind === "event" ? itemSheet.certaintyId : "",
         repeatMode,
+        ...(repeatMode === "weekly" ? { repeatWeekdays } : {}),
         repeatUntil: repeatMode !== "none" ? normalizeRepeatUntil($("#itemRepeatUntil").value, startDate) : "",
         imageData: itemSheet.imageData
       };
@@ -6125,6 +6258,7 @@
         if (answer === "one") {
           const occurrence = itemSheet.occurrenceStart;
           const single = { id: makeId("todo"), ...fields, kind: "event", repeatMode: "none", repeatUntil: "", done: false };
+          delete single.repeatWeekdays;
           stampCreated(single);
           const previousExceptions = existing.exceptionDates ? existing.exceptionDates.slice() : undefined;
           existing.exceptionDates = [...new Set([...(existing.exceptionDates || []), occurrence])].sort();
@@ -6150,14 +6284,16 @@
 
       if (itemSheet.mode === "add") {
         const todo = { id: makeId("todo"), ...fields, done: false };
-        if (typeof stampCreated === "function") stampCreated(todo);
-        state.todos.push(todo);
+        const created = splitWeeklyTodo(todo);
+        created.forEach(stampCreated);
+        state.todos.push(...created);
         closeSheet("itemSheet");
         renderAll();
-        showToast(`${kind === "event" ? "予定" : "Todo"}「${title}」を追加しました`, () => {
-          state.todos = state.todos.filter(item => item !== todo);
+        const note = created.length > 1 ? `（曜日ごとに${created.length}件）` : "";
+        showToast(`${kind === "event" ? "予定" : "Todo"}「${title}」を追加しました${note}`, () => {
+          state.todos = state.todos.filter(item => !created.includes(item));
           renderAll();
-        });
+        }, 5000, () => openItemSheet({ id: created[0].id }));
         return;
       }
       const todo = state.todos.find(item => item.id === itemSheet.id);
@@ -6165,12 +6301,19 @@
       const previous = { ...todo };
       Object.assign(todo, fields);
       if (!fields.repeatAnchor) delete todo.repeatAnchor;
+      if (repeatMode !== "weekly") delete todo.repeatWeekdays;
       if (!todo.imageId) delete todo.imageId;
       if (kind !== "event") todo.done = Boolean(todo.done);
       if (typeof stampUpdated === "function") stampUpdated(todo);
+      const branches = splitWeeklyTodo(todo);
+      Object.assign(todo, branches[0]);
+      const extraTodos = branches.slice(1);
+      extraTodos.forEach(stampCreated);
+      state.todos.push(...extraTodos);
       closeSheet("itemSheet");
       renderAll();
       showToast("変更を保存しました", () => {
+        state.todos = state.todos.filter(item => !extraTodos.includes(item));
         Object.keys(todo).forEach(key => { if (!(key in previous)) delete todo[key]; });
         Object.assign(todo, previous);
         renderAll();
@@ -7039,16 +7182,12 @@
         case "override": openOverrideSheet(date); break;
         case "open-day":
           state.selectedDate = date;
-          state.calendarMode = "day";
-          uiOpenSections.dayTodos = null;
-          navigateFast("calendar");
+          navigateFast("today");
           window.scrollTo({ top: 0, behavior: "instant" });
           break;
         case "month-select":
           if (date === state.selectedDate) {
-            state.calendarMode = "day";
-            uiOpenSections.dayTodos = null;
-            navigateFast("calendar");
+            navigateFast("today");
             window.scrollTo({ top: 0, behavior: "instant" });
           } else {
             state.selectedDate = date;
@@ -7059,8 +7198,7 @@
         case "timeline-tap":
           if (event.target === target && window.innerWidth >= 720 && state.calendarMode === "week") {
             state.selectedDate = date;
-            state.calendarMode = "day";
-            navigateFast("calendar");
+            navigateFast("today");
           }
           break;
         case "toggle-classes":
@@ -7187,6 +7325,7 @@
         const nav = event.target.closest("[data-nav]");
         if (nav) {
           closeFabMenu();
+          if (nav.dataset.nav === "today") state.selectedDate = todayString();
           navigateFast(nav.dataset.nav);
           return;
         }
@@ -7223,8 +7362,21 @@
         hideToast();
         if (undo) undo();
       });
+      $("#toast").addEventListener("click", event => {
+        if (event.target.closest("#toastAction")) return;
+        const open = toastTap;
+        if (!open) return;
+        hideToast();
+        open();
+      });
 
       // カレンダー
+      $("#overviewPrev").addEventListener("click", () => openDailyOverview(dateOffset(state.selectedDate, -1)));
+      $("#overviewNext").addEventListener("click", () => openDailyOverview(dateOffset(state.selectedDate, 1)));
+      $("#overviewToday").addEventListener("click", () => openDailyOverview(todayString()));
+      $("#overviewDateInput").addEventListener("change", event => {
+        if (isValidDateString(event.target.value)) openDailyOverview(event.target.value);
+      });
       $$("[data-calendar-mode]").forEach(button => button.addEventListener("click", () => {
         state.calendarMode = button.dataset.calendarMode;
         if (state.calendarMode === "month") state.monthCursor = state.selectedDate;
@@ -7314,6 +7466,7 @@
         $("#itemDate").value = button.dataset.quickDate;
         if (itemSheet.kind === "event") $("#itemEndDate").value = dateOffset(button.dataset.quickDate, duration);
         renderQuickDates();
+        updateRepeatUntilVisibility();
       });
       $("#itemDate").addEventListener("change", () => {
         if (itemSheet.kind === "event") {
@@ -7321,8 +7474,17 @@
           if (!$("#itemEndDate").value || $("#itemEndDate").value < start) $("#itemEndDate").value = start;
         }
         renderQuickDates();
+        updateRepeatUntilVisibility();
       });
       $("#itemRepeatMode").addEventListener("change", () => { updateRepeatUntilVisibility(); updateSeriesNote(); });
+      $("#itemRepeatWeekdays").addEventListener("click", event => {
+        const button = event.target.closest("[data-repeat-weekday]");
+        if (!button) return;
+        button.setAttribute("aria-pressed", String(button.getAttribute("aria-pressed") !== "true"));
+        itemSheet.repeatWeekdaysExplicit = true;
+        updateRepeatWeekdaysHint();
+      });
+      $("#itemRepeatUntil").addEventListener("change", updateRepeatWeekdaysHint);
       $("#itemTitle").addEventListener("input", () => { $("#itemTitleError").hidden = true; });
       $("#itemTitle").addEventListener("keydown", event => {
         if (event.key === "Enter" && !event.isComposing) {
@@ -7494,7 +7656,7 @@
     // ---- 初期化 -----------------------------------------------------------
     function initUi() {
       mapLegacyView(state);
-      if (!["day", "week", "month"].includes(state.calendarMode)) state.calendarMode = "day";
+      if (!["week", "month"].includes(state.calendarMode)) state.calendarMode = "week";
       if (!["list", "board"].includes(state.todoMode)) state.todoMode = "list";
       if (!isValidDateString(state.boardStart)) state.boardStart = todayString();
       if (!MAIN_VIEWS.includes(state.view)) state.view = "today";
