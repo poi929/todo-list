@@ -18,9 +18,9 @@ const context = vm.createContext({
 vm.runInContext(scripts[0].replace(/\n    initUi\(\);/, ''), context);
 vm.runInContext(`globalThis.api = { nextTodoDueDate, isEventOnDate, eventOccurrenceRangeOnDate,
   eventRepeatLabel, todoRepeatLabel, normalizeParsedState, normalizeRepeatWeekdays, initialState,
-  runSelfTests, nextRepeatWeekdayDate, splitWeeklyTodo, isRecurringTodo, isVisibleInMonth,
+  runSelfTests, nextRepeatWeekdayDate, splitWeeklyTodo, isRecurringTodo, isVisibleInMonthGrid,
   compareMonthTodoEntries, monthWeekLayout, mapLegacyView, defaultAddDate,
-  viewRenderKey, toggleTodo, renderToday, showToast, hideToast,
+  viewRenderKey, toggleTodo, renderToday, renderCalendarMonth, showToast, hideToast,
   setTodos: todos => { state.todos = todos; dataVersion += 1; },
   setState: patch => Object.assign(state, patch), getState: () => state };`, context);
 const api = context.api;
@@ -148,11 +148,37 @@ test('month sorts by importance, then puts recurring Todo last within that impor
   assert.deepEqual(Array.from(layout.placed).sort((a,b) => a.lane - b.lane).map(item => item.todo.id), ['high-single', 'high-repeat', 'medium-single', 'medium-repeat', 'low-single']);
   assert.equal(Array.from(layout.hidden).reduce((a,b) => a+b, 0), 0);
 });
-test('low repeating Todo are hidden, low single Todo and events remain visible', () => {
-  assert.equal(api.isVisibleInMonth({ ...todo, importance: '低' }), false);
-  assert.equal(api.isVisibleInMonth({ ...todo, importance: '低', repeatMode: 'none', done: true, repeatSourceId: 'original' }), false);
-  assert.equal(api.isVisibleInMonth({ ...todo, importance: '低', repeatMode: 'none' }), true);
-  assert.equal(api.isVisibleInMonth({ ...event, importance: '低' }), true);
+test('month grid hides low repeating Todo, while low single Todo and events remain visible', () => {
+  assert.equal(api.isVisibleInMonthGrid({ ...todo, importance: '低' }), false);
+  assert.equal(api.isVisibleInMonthGrid({ ...todo, importance: '低', repeatMode: 'none', done: true, repeatSourceId: 'original' }), false);
+  assert.equal(api.isVisibleInMonthGrid({ ...todo, importance: '低', repeatMode: 'none' }), true);
+  assert.equal(api.isVisibleInMonthGrid({ ...event, importance: '低' }), true);
+});
+
+test('selected-day list below month grid includes low recurring Todo in priority order', () => {
+  const nodes = new Map();
+  const makeNode = () => ({ innerHTML:'', childElementCount:1,
+    getBoundingClientRect: () => ({top:200, bottom:240, height:40}) });
+  const node = selector => { if (!nodes.has(selector)) nodes.set(selector, makeNode()); return nodes.get(selector); };
+  const doc = context.document;
+  const win = context.window;
+  context.document = { ...doc, querySelector:node, getElementById:id => node('#'+id), querySelectorAll:() => [] };
+  context.window = { ...win, innerWidth:390, innerHeight:844, scrollY:0 };
+  api.setTodos([
+    { ...todo, id:'low-repeat', title:'low-recurring-task', importance:'低', repeatWeekdays:[1] },
+    { ...todo, id:'low-single', title:'low-single-task', importance:'低', repeatMode:'none' },
+    { ...todo, id:'high-single', title:'high-single-task', importance:'高', repeatMode:'none' }
+  ]);
+  api.setState({selectedDate:'2026-10-19', calendarMode:'month', showClassesInTimeline:false});
+  try {
+    api.renderCalendarMonth('2026-10-01');
+    const [grid, agenda] = node('#calPane-month').innerHTML.split('<div class="month-agenda">');
+    assert.doesNotMatch(grid, /low-recurring-task/);
+    assert.match(grid, /low-single-task/);
+    assert.match(agenda, /low-recurring-task/);
+    assert.ok(agenda.indexOf('high-single-task') < agenda.indexOf('low-single-task'));
+    assert.ok(agenda.indexOf('low-single-task') < agenda.indexOf('low-recurring-task'));
+  } finally { context.document = doc; context.window = win; }
 });
 test('hidden low recurring Todo do not inflate month overflow counts', () => {
   api.setTodos([{ ...todo, repeatWeekdays:[1], importance: '低' }]);

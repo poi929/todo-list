@@ -1431,7 +1431,7 @@
   </div>
 
   <script>
-    const APP_VERSION = "v114";
+    const APP_VERSION = "v115";
     // 保存キーは変更しない。旧版の removeOldStorageKeys() は「todo-calendar-board-v数字」の
     // 自分以外のキーを削除するため、キー名を変えると旧版へ戻した時に新データが消える。
     const STORAGE_KEY = "todo-calendar-board-v96";
@@ -3564,7 +3564,7 @@
       return todo.kind !== "event" && (todoRepeatMode(todo) !== "none" || Boolean(todo.repeatSourceId));
     }
 
-    function isVisibleInMonth(todo) {
+    function isVisibleInMonthGrid(todo) {
       return !(todo.importance === "低" && isRecurringTodo(todo));
     }
 
@@ -5078,7 +5078,7 @@
     function renderCalendarWeek(start) {
       const dates = getDateRange(start, 7);
       const { startHour, endHour } = timelineHourRange();
-      const px = window.innerWidth < 720 ? 44 : 50;
+      const px = window.innerWidth < 720 ? 28 : 34;
       const height = (endHour - startHour) * px;
       const today = todayString();
       const heads = dates.map(date => {
@@ -5131,7 +5131,7 @@
       const groups = new Map();
       dates.forEach((date, col) => {
         effectiveTodosForDate(date).forEach(entry => {
-          if (entry.isCarryOver || !isVisibleInMonth(entry.todo)) return;
+          if (entry.isCarryOver || !isVisibleInMonthGrid(entry.todo)) return;
           const todo = entry.todo;
           let key = todo.id + "|" + date;
           let startCol = col;
@@ -5261,7 +5261,7 @@
           const d = toDate(date);
           const wd = d.getDay();
           const outside = d.getMonth() !== first.getMonth();
-          const count = effectiveTodosForDate(date).filter(entry => !entry.isCarryOver && isVisibleInMonth(entry.todo)).length;
+          const count = effectiveTodosForDate(date).filter(entry => !entry.isCarryOver && isVisibleInMonthGrid(entry.todo)).length;
           const holiday = japaneseHolidayName(date);
           const holidayClass = holiday ? "holiday" : "";
           const aria = `${dateLabel(date)}${holiday ? "、" + holiday : ""}、${count}件`;
@@ -5273,9 +5273,9 @@
         body += `<div class="month-week" style="--lanes:${weekLanes}">${dayCells}${holidayBars}${placed.map(monthBarHtml).join("")}${more}</div>`;
       }
 
-      // 選んだ日の一覧
+      // 選んだ日の一覧は、月カレンダーのマスで隠したTodoも表示する。
       const agenda = agendaItemsForDate(selected, false);
-      const todos = effectiveTodosForDate(selected).filter(entry => entry.todo.kind !== "event" && isVisibleInMonth(entry.todo))
+      const todos = effectiveTodosForDate(selected).filter(entry => entry.todo.kind !== "event")
         .sort(compareMonthTodoEntries);
       const listHtml = agenda.length || todos.length
         ? `${agenda.length ? `<div class="rows" style="margin-bottom:10px">${agenda.map(item => agendaRowHtml(item, selected)).join("")}</div>` : ""}
