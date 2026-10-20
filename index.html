@@ -264,6 +264,7 @@
     .check {
       flex: 0 0 auto; width: 48px; display: grid; place-items: center;
       border: 0; background: transparent; padding: 0;
+      touch-action: pan-y; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
     }
     .check::before {
       content: ""; width: 22px; height: 22px; border-radius: 50%;
@@ -792,6 +793,15 @@
     .m-bar.todo::before { content: ""; display: inline-block; width: 6px; height: 6px; margin: 0 2px 1px 1px; border-radius: 50%; background: var(--dot); vertical-align: middle; }
     .m-bar.todo.overdue { box-shadow: inset 0 0 0 1px var(--danger); }
     .m-bar.done { opacity: .5; text-decoration: line-through; }
+    .check.is-holding::before { border-color: var(--accent); box-shadow: 0 0 0 4px var(--line); }
+    .row.failed .row-title, .board-card.failed .bt, .m-bar.failed { text-decoration: none; }
+    .row.failed .row-title, .board-card.failed .bt { color: var(--text); }
+    .row.failed .check::before, .board-card.failed .check::before {
+      content: "×"; display: grid; place-items: center; color: var(--danger);
+      background: var(--danger-soft); border-color: var(--danger); font-size: 20px; font-weight: 600; line-height: 1;
+    }
+    .todo-failed-label { color: var(--danger); font-weight: 600; }
+    .button.todo-failure-action { color: var(--danger); background: var(--danger-soft); border-color: var(--danger-line); }
     .m-bar .m-time { margin-right: 2px; font-weight: 600; opacity: .9; font-size: 10px; }
     .m-more { position: relative; z-index: 1; text-align: center; font-size: 10px; line-height: 14px; color: var(--muted); font-weight: 700; pointer-events: none; }
     .month-cell.outside ~ .m-bar { }
@@ -1431,7 +1441,7 @@
   </div>
 
   <script>
-    const APP_VERSION = "v115";
+    const APP_VERSION = "v116";
     // 保存キーは変更しない。旧版の removeOldStorageKeys() は「todo-calendar-board-v数字」の
     // 自分以外のキーを削除するため、キー名を変えると旧版へ戻した時に新データが消える。
     const STORAGE_KEY = "todo-calendar-board-v96";
@@ -2992,7 +3002,7 @@
           : "";
         const repeatMode = normalizeEventRepeatMode(todo.repeatMode);
         const repeatUntil = repeatMode !== "none" ? normalizeRepeatUntil(todo.repeatUntil, date) : "";
-        const { minutes, repeatAnchor, repeatWeekdays, ...rest } = todo;
+        const { minutes, repeatAnchor, repeatWeekdays, failed, ...rest } = todo;
         return {
           ...rest,
           id: String(todo.id ?? makeId("todo")),
@@ -3012,6 +3022,7 @@
           ...(repeatMode === "weekly" ? { repeatWeekdays: normalizeRepeatWeekdays(repeatWeekdays, date) } : {}),
           imageData: safeImageSrc(todo.imageData),
           done: Boolean(todo.done),
+          ...(kind === "todo" && todo.done && failed === true ? { failed: true } : {}),
           ...(kind === "todo" && repeatMode === "monthly" && isValidDateString(repeatAnchor) ? { repeatAnchor } : {}),
           ...(Array.isArray(todo.exceptionDates) ? { exceptionDates: [...new Set(todo.exceptionDates.filter(isValidDateString))].sort() } : {}),
           ...(typeof todo.imageId === "string" && todo.imageId ? { imageId: todo.imageId } : {})
@@ -4726,6 +4737,7 @@
     function todoRowHtml(todo, options = {}) {
       const carry = Boolean(options.carry);
       const isDone = Boolean(todo.done) && !carry;
+      const isFailed = isDone && todo.failed === true;
       const level = carry ? "高" : (["高", "中", "低"].includes(todo.importance) ? todo.importance : "中");
       const dot = importanceDotColor(level);
       const today = todayString();
@@ -4735,11 +4747,12 @@
         : `<span>${escapeHtml(options.hideDate ? "" : relativeDateLabel(todo.date))}${todo.deadlineTime ? (options.hideDate ? "" : " ") + escapeHtml(todo.deadlineTime) + "まで" : ""}</span>`;
       const detail = options.showDetail !== false && todo.detail ? `<div class="row-detail">${escapeHtml(todo.detail)}</div>` : "";
       return `
-        <div class="row todo-row ${isDone ? "done" : ""}" style="--check-color:${overdueDays > 0 ? "var(--danger)" : dot}">
-          <button class="check" type="button" data-action="toggle" data-id="${escapeHtml(todo.id)}" aria-label="${isDone ? "未完了に戻す" : "完了にする"}：${escapeHtml(todo.title)}" aria-pressed="${isDone}"></button>
+        <div class="row todo-row ${isDone ? "done" : ""} ${isFailed ? "failed" : ""}" style="--check-color:${overdueDays > 0 ? "var(--danger)" : dot}">
+          <button class="check" type="button" data-action="toggle" data-id="${escapeHtml(todo.id)}" aria-label="${isDone && !isFailed ? "未完了に戻す" : "完了にする"}：${escapeHtml(todo.title)}。長押しで失敗を選択" aria-pressed="${isDone && !isFailed}" aria-keyshortcuts="Shift+Enter"></button>
           <div class="row-main" data-action="edit" data-id="${escapeHtml(todo.id)}" role="button" tabindex="0">
             <div class="row-title">${escapeHtml(todo.title || "（題名なし）")}</div>
             <div class="row-meta">
+              ${isFailed ? `<span class="todo-failed-label">失敗</span>` : ""}
               <span class="imp" style="--dot:${dot}">${escapeHtml(level)}</span>
               ${due}
               ${todoRepeatMode(todo) !== "none" ? `<span>${escapeHtml(repeatFrequencyLabel(todo))}</span>` : ""}
@@ -5205,10 +5218,11 @@
         const tint = importanceColor(todo.importance);
         style = `background:${tint};color:#1f2430;--dot:${overdue ? "var(--danger)" : importanceDotColor(todo.importance)};`;
       }
-      const classes = ["m-bar", isEvent ? "event" : "todo", item.multi ? "multi" : "", done ? "done" : "", overdue ? "overdue" : "",
+      const failed = done && todo.failed === true;
+      const classes = ["m-bar", isEvent ? "event" : "todo", item.multi ? "multi" : "", done ? "done" : "", failed ? "failed" : "", overdue ? "overdue" : "",
         item.continuesLeft ? "cont-left" : "", item.continuesRight ? "cont-right" : ""].filter(Boolean).join(" ");
       return `<span class="${classes}" style="grid-column:${item.startCol + 1} / ${item.endCol + 2};grid-row:${item.lane + 2};${style}"
-        data-action="edit" data-id="${escapeHtml(todo.id)}" data-date="${escapeHtml(item.sortDate)}" title="${escapeHtml(todo.title)}">${escapeHtml(todo.title || "（題名なし）")}</span>`;
+        data-action="edit" data-id="${escapeHtml(todo.id)}" data-date="${escapeHtml(item.sortDate)}" title="${escapeHtml(todo.title)}${failed ? "（失敗）" : ""}">${failed ? "× " : ""}${escapeHtml(todo.title || "（題名なし）")}</span>`;
     }
 
     function renderCalendarMonth(cursor) {
@@ -5406,7 +5420,7 @@
       if (kind !== "event") {
         const done = filtered.filter(todo => todo.kind !== "event" && todo.done).sort(compareDoneTodos);
         if (done.length) {
-          groups.push(`<div class="section">${sectionToggleHtml("done", "完了済み", done.length)}
+          groups.push(`<div class="section">${sectionToggleHtml("done", "完了・失敗", done.length)}
             ${uiOpenSections.done ? `<div class="rows">${done.slice(0, todoDoneLimit).map(todo => todoRowHtml(todo, { showDetail: false })).join("")}</div>
             ${done.length > todoDoneLimit ? `<button type="button" class="button" style="width:100%;margin-top:8px" data-action="more-done">さらに表示（残り${done.length - todoDoneLimit}件）</button>` : ""}` : ""}</div>`);
         }
@@ -5453,9 +5467,10 @@
           return `<td>${entries.map(entry => {
             const todo = entry.todo;
             const done = todo.done && !entry.isCarryOver;
-            return `<div class="board-card ${done ? "done" : ""} ${entry.isCarryOver ? "overdue" : ""}" style="--dot:${importanceDotColor(entry.isCarryOver ? "高" : todo.importance)}" data-action="edit" data-id="${escapeHtml(todo.id)}" title="${escapeHtml(todo.title)}">
-              <button type="button" class="check" data-action="toggle" data-id="${escapeHtml(todo.id)}" aria-label="${done ? "未完了に戻す" : "完了にする"}：${escapeHtml(todo.title)}"></button>
-              <span class="bt">${escapeHtml(todo.title)}</span></div>`;
+            const failed = done && todo.failed === true;
+            return `<div class="board-card ${done ? "done" : ""} ${failed ? "failed" : ""} ${entry.isCarryOver ? "overdue" : ""}" style="--dot:${importanceDotColor(entry.isCarryOver ? "高" : todo.importance)}" data-action="edit" data-id="${escapeHtml(todo.id)}" title="${escapeHtml(todo.title)}">
+              <button type="button" class="check" data-action="toggle" data-id="${escapeHtml(todo.id)}" aria-label="${done && !failed ? "未完了に戻す" : "完了にする"}：${escapeHtml(todo.title)}。長押しで失敗を選択" aria-pressed="${Boolean(done && !failed)}" aria-keyshortcuts="Shift+Enter"></button>
+              <span class="bt">${escapeHtml(todo.title)}${failed ? `<span class="todo-failed-label"> 失敗</span>` : ""}</span></div>`;
           }).join("")}</td>`;
         }).join("");
         return `${group}<tr><td class="cat-cell">${escapeHtml(category.childName)}<small>${escapeHtml(category.parentName)}</small></td>${cells}</tr>`;
@@ -5931,42 +5946,136 @@
     // ---- Todo・予定の完了と削除（元に戻す付き） ---------------------------
     function toggleTodo(id) {
       const todo = state.todos.find(item => item.id === id);
-      if (!todo) return;
-      // 繰り返しのTodo：完了した回を完了済みとして残し、締切日を次の回へ進める
-      const nextDue = !todo.done ? nextTodoDueDate(todo) : "";
+      if (!todo || todo.kind === "event") return;
+      setTodoResult(id, todo.done && !todo.failed ? "pending" : "done");
+    }
+
+    function setTodoResult(id, result) {
+      const todo = state.todos.find(item => item.id === id);
+      if (!todo || todo.kind === "event" || !["pending", "done", "failed"].includes(result)) return;
+      const current = !todo.done ? "pending" : todo.failed === true ? "failed" : "done";
+      if (current === result) return;
+      const finished = result !== "pending";
+      const resultLabel = result === "failed" ? "失敗" : result === "done" ? "完了" : "未完了";
+      function applyResult(item) {
+        // done は「今回分の処理が終了した」ことを表し、失敗は failed で区別する。
+        item.done = finished;
+        if (result === "failed") item.failed = true; else delete item.failed;
+        markCompletion(item);
+      }
+      // 繰り返しは今回の結果を記録し、元の項目だけを次の締切へ進める。
+      const nextDue = !todo.done && finished ? nextTodoDueDate(todo) : "";
       if (nextDue) {
         const before = { date: todo.date, updatedAt: todo.updatedAt, anchor: todo.repeatAnchor };
-        const record = { ...todo, id: makeId("todo"), done: true, repeatMode: "none", repeatUntil: "", repeatSourceId: todo.repeatSourceId || todo.id };
+        const record = { ...todo, id: makeId("todo"), repeatMode: "none", repeatUntil: "", repeatSourceId: todo.repeatSourceId || todo.id };
         delete record.repeatAnchor;
         delete record.repeatWeekdays;
         delete record.exceptionDates;
         stampCreated(record);
         if (todo.createdAt) record.createdAt = todo.createdAt;
-        markCompletion(record);
+        applyResult(record);
         if (todo.repeatMode === "monthly" && !isValidDateString(todo.repeatAnchor)) todo.repeatAnchor = todo.date;
         todo.date = nextDue;
         stampUpdated(todo);
         state.todos.push(record);
         renderAll();
-        showToast(`「${todo.title}」を完了にしました。次の締切は${dateLabel(nextDue)}です`, () => {
+        flushSave();
+        showToast(`「${todo.title}」を${resultLabel}にしました。次の締切は${dateLabel(nextDue)}です`, () => {
           state.todos = state.todos.filter(item => item !== record);
           todo.date = before.date;
           if (before.anchor === undefined) delete todo.repeatAnchor; else todo.repeatAnchor = before.anchor;
           if (before.updatedAt === undefined) delete todo.updatedAt; else todo.updatedAt = before.updatedAt;
           renderAll();
+          flushSave();
         }, 4000);
         return;
       }
-      const previous = { done: Boolean(todo.done), completedAt: todo.completedAt };
-      todo.done = !todo.done;
-      if (typeof markCompletion === "function") markCompletion(todo);
+      const keys = ["done", "failed", "completedAt", "updatedAt"];
+      const previous = Object.fromEntries(keys.filter(key => Object.hasOwn(todo, key)).map(key => [key, todo[key]]));
+      applyResult(todo);
       renderAll();
-      showToast(todo.done ? `「${todo.title}」を完了にしました` : `「${todo.title}」を未完了に戻しました`, () => {
-        todo.done = previous.done;
-        if (previous.completedAt === undefined) delete todo.completedAt;
-        else todo.completedAt = previous.completedAt;
+      flushSave();
+      showToast(`「${todo.title}」を${resultLabel}にしました`, () => {
+        keys.forEach(key => { if (Object.hasOwn(previous, key)) todo[key] = previous[key]; else delete todo[key]; });
         renderAll();
+        flushSave();
       }, 4000);
+    }
+
+    async function requestTodoFailure(id) {
+      const todo = state.todos.find(item => item.id === id);
+      if (!todo || todo.kind === "event") return;
+      const before = { date: todo.date, done: todo.done, failed: todo.failed, updatedAt: todo.updatedAt };
+      const nextDue = !todo.done ? nextTodoDueDate(todo) : "";
+      const answer = await confirmDialog({
+        title: "このタスクを失敗にしますか？",
+        message: `${todo.title || "（題名なし）"}\n\n今回分を「失敗」として記録します。${nextDue ? `\n次の締切は${dateLabel(nextDue)}です。` : ""}`,
+        buttons: [{ label: "失敗にする", value: true, style: "todo-failure-action" }, { label: "キャンセル", value: null }]
+      });
+      // 確認中に別の操作で対象が変わった場合は、その新しい回を失敗にしない。
+      if (answer === true && state.todos.includes(todo) && Object.keys(before).every(key => todo[key] === before[key])) {
+        setTodoResult(id, "failed");
+      }
+    }
+
+    function bindTodoLongPress() {
+      let press = null;
+      const suppressedClicks = new WeakSet();
+      const checkButton = target => target.closest?.('.check[data-action="toggle"]');
+      function cancel(suppressClick = false) {
+        if (!press) return;
+        clearTimeout(press.timer);
+        press.button.classList.remove("is-holding");
+        if (suppressClick) suppressedClicks.add(press.button);
+        press = null;
+      }
+      document.addEventListener("pointerdown", event => {
+        if (press) { cancel(true); return; }
+        if (event.button !== 0 || event.isPrimary === false || sheetStack.length) return;
+        const button = checkButton(event.target);
+        if (!button) return;
+        suppressedClicks.delete(button);
+        press = { button, pointerId: event.pointerId, x: event.clientX, y: event.clientY, timer: null };
+        button.classList.add("is-holding");
+        press.timer = setTimeout(() => {
+          const heldButton = press?.button;
+          cancel(true);
+          if (heldButton && document.contains(heldButton) && !sheetStack.length) requestTodoFailure(heldButton.dataset.id);
+        }, 600);
+      });
+      document.addEventListener("pointermove", event => {
+        if (press && press.pointerId === event.pointerId && Math.hypot(event.clientX - press.x, event.clientY - press.y) > 10) cancel(true);
+      }, { passive: true });
+      document.addEventListener("pointerup", event => { if (press?.pointerId === event.pointerId) cancel(); });
+      document.addEventListener("pointercancel", () => cancel(true));
+      document.addEventListener("scroll", () => cancel(true), { capture: true, passive: true });
+      window.addEventListener("blur", () => cancel(true));
+      document.addEventListener("visibilitychange", () => { if (document.hidden) cancel(true); });
+      // 長押しを離した時やスクロール後に発生するクリックで、完了へ変えない。
+      document.addEventListener("click", event => {
+        const button = checkButton(event.target);
+        if (button && suppressedClicks.has(button)) {
+          suppressedClicks.delete(button);
+          event.preventDefault();
+          event.stopImmediatePropagation();
+        }
+      }, true);
+      document.addEventListener("contextmenu", event => {
+        const button = checkButton(event.target);
+        if (!button) return;
+        event.preventDefault();
+        cancel(true);
+        suppressedClicks.add(button);
+        if (!sheetStack.length) requestTodoFailure(button.dataset.id);
+      });
+      document.addEventListener("keydown", event => {
+        const button = checkButton(event.target);
+        if (button && event.shiftKey && event.key === "Enter") {
+          event.preventDefault();
+          cancel(true);
+          if (!sheetStack.length) requestTodoFailure(button.dataset.id);
+        }
+      });
     }
 
     function deleteTodo(id) {
@@ -7274,7 +7383,7 @@
         if (event.touches.length !== 1) { tracking = false; return; }
         const t = event.touches[0];
         startX = t.clientX; startY = t.clientY; startTime = Date.now();
-        tracking = !event.target.closest(".board-wrap, input, select, textarea");
+        tracking = !event.target.closest(".board-wrap, .check, input, select, textarea");
       }, { passive: true });
       element.addEventListener("touchend", event => {
         if (!tracking) return;
@@ -7312,6 +7421,7 @@
     }
 
     function bindEvents() {
+      bindTodoLongPress();
       document.addEventListener("click", event => {
         if (event.target.closest("[data-close-sheet]")) {
           const backdrop = event.target.closest(".sheet-backdrop");
