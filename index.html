@@ -684,17 +684,18 @@
     }
     .fab-menu .icon { color: var(--accent); }
     .toast {
-      position: fixed; left: 50%; transform: translateX(-50%); z-index: 70;
-      bottom: calc(var(--tabbar-h) + var(--safe-b) + 16px);
-      display: flex; align-items: center; gap: 12px; max-width: calc(100% - 32px);
+      position: fixed; left: 50%; transform: translateX(-50%); z-index: 44;
+      bottom: calc(var(--tabbar-h) + var(--safe-b) + 84px);
+      display: flex; align-items: center; gap: 12px; width: max-content; max-width: calc(100% - 32px);
       padding: 10px 10px 10px 16px; border-radius: 12px; background: #1f2430; color: #fff; font-size: 14px;
       box-shadow: var(--shadow-3); animation: sheetUp .18s ease;
     }
     .toast button { min-height: 36px; padding: 4px 12px; border: 0; border-radius: 8px; background: rgba(255,255,255,.14); color: #c7ccff; font-weight: 700; white-space: nowrap; }
-    .toast #toastMessage { flex: 1; min-width: 0; padding: 0; background: transparent; color: inherit; font-weight: inherit; text-align: left; white-space: normal; }
+    .toast #toastMessage { flex: 1; min-width: 0; padding: 0; background: transparent; color: inherit; font-weight: inherit; text-align: left; white-space: normal; overflow-wrap: anywhere; }
     .toast #toastMessage:disabled { opacity: 1; cursor: default; }
     .toast #toastMessage:not(:disabled)::after { content: "タップして編集"; display: block; margin-top: 3px; color: #c7ccff; font-size: 11px; }
     .toast.clickable { cursor: pointer; }
+    .toast.sheet-feedback { z-index: 70; }
     .update-notice {
       position: fixed; left: 12px; right: 12px; z-index: 75; bottom: calc(var(--tabbar-h) + var(--safe-b) + 84px);
       display: flex; align-items: center; justify-content: space-between; gap: 10px;
@@ -758,7 +759,7 @@
       .calendar-toolbar { grid-template-columns: 260px 1fr; align-items: center; }
       .fab { right: 32px; bottom: 32px; }
       .fab-menu { right: 32px; bottom: 100px; }
-      .toast { bottom: 32px; }
+      .toast { bottom: 100px; }
       .update-notice { left: auto; right: 32px; bottom: 100px; max-width: 420px; }
       .sheet-backdrop { align-items: center; padding: 24px; }
       .sheet { max-width: 600px; border-radius: 20px; max-height: calc(100dvh - 48px); }
@@ -1495,7 +1496,7 @@
   </div>
 
   <script>
-    const APP_VERSION = "v117";
+    const APP_VERSION = "v118";
     // 保存キーは変更しない。旧版の removeOldStorageKeys() は「todo-calendar-board-v数字」の
     // 自分以外のキーを削除するため、キー名を変えると旧版へ戻した時に新データが消える。
     const STORAGE_KEY = "todo-calendar-board-v96";
@@ -4490,6 +4491,7 @@
       $("#toastMessage").disabled = !toastTap;
       $("#toastMessage").setAttribute("aria-label", message + (toastTap ? "。タップして編集" : ""));
       toast.classList.toggle("clickable", Boolean(toastTap));
+      toast.classList.toggle("sheet-feedback", sheetStack.length > 0);
       const action = $("#toastAction");
       toastUndo = typeof undo === "function" ? undo : null;
       action.hidden = !toastUndo;
