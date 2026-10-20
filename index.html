@@ -1496,7 +1496,7 @@
   </div>
 
   <script>
-    const APP_VERSION = "v118";
+    const APP_VERSION = "v119";
     // 保存キーは変更しない。旧版の removeOldStorageKeys() は「todo-calendar-board-v数字」の
     // 自分以外のキーを削除するため、キー名を変えると旧版へ戻した時に新データが消える。
     const STORAGE_KEY = "todo-calendar-board-v96";
@@ -6514,7 +6514,7 @@
         showToast(`${kind === "event" ? "予定" : "Todo"}「${title}」を追加しました${note}`, () => {
           state.todos = state.todos.filter(item => !created.includes(item));
           renderAll();
-        }, 5000, () => openItemSheet({ id: created[0].id }));
+        }, 3000, () => openItemSheet({ id: created[0].id }));
         return;
       }
       const todo = state.todos.find(item => item.id === itemSheet.id);
