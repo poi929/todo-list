@@ -596,6 +596,41 @@
     .sheet.small .sheet-body { padding-bottom: 16px; }
     .confirm-message { margin: 0; white-space: pre-line; font-size: 15px; color: var(--text-2); }
 
+    .category-select-button {
+      display: flex; align-items: center; gap: 12px; width: 100%; min-height: 62px;
+      padding: 10px 14px; border: 1px solid var(--line-2); border-radius: var(--radius-sm);
+      background: var(--surface); text-align: left;
+    }
+    .category-select-button:hover { border-color: var(--accent); background: var(--surface-2); }
+    .category-select-button > .icon { color: var(--muted); }
+    .category-select-value { flex: 1; min-width: 0; display: grid; gap: 2px; overflow-wrap: anywhere; }
+    .category-select-parent { color: var(--muted); font-size: 12px; }
+    .category-select-child { color: var(--text); font-size: 15px; font-weight: 600; }
+    .category-picker-controls { padding: 8px 20px 14px; border-bottom: 1px solid var(--line); }
+    .category-picker-controls .field { margin: 0; }
+    .category-picker-controls input { width: 100%; min-width: 0; }
+    .category-parent-filters { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; max-height: 132px; overflow-y: auto; }
+    .category-parent-filters button {
+      min-height: 44px; padding: 8px 12px; max-width: 100%; overflow-wrap: anywhere;
+      border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--text-2); font-size: 13px;
+    }
+    .category-parent-filters button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent-line); color: var(--accent); font-weight: 600; }
+    .category-picker-group { margin: 12px 0 18px; }
+    .category-picker-group h3 { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--muted); overflow-wrap: anywhere; }
+    .category-choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .category-choice {
+      display: flex; align-items: center; gap: 8px; min-height: 52px; min-width: 0; padding: 10px 12px;
+      background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--radius-sm); text-align: left;
+    }
+    .category-choice span:first-child { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+    .category-choice-mark { flex: 0 0 auto; width: 18px; color: var(--accent); font-weight: 700; }
+    .category-choice[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+    .category-choice:hover { border-color: var(--accent); }
+    .category-picker-empty { margin: 20px 0; color: var(--muted); }
+    #categoryPickerStatus { margin: 10px 20px 0; color: var(--muted); font-size: 12px; }
+    #categoryPickerSheet .sheet { max-width: 560px; }
+    #categoryPickerSheet .sheet-body { min-height: 120px; }
+
     .quick-dates { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
     .quick-dates button { min-height: 34px; padding: 4px 12px; border: 1px solid var(--line-2); border-radius: 999px; background: var(--surface); font-size: 13px; font-weight: 600; color: var(--text-2); }
     .quick-dates button.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
@@ -1137,10 +1172,13 @@
           <div class="segmented wide" id="itemCertainty"></div>
         </div>
 
-        <label class="field">
-          <span class="field-label">カテゴリ</span>
-          <select id="itemCategory"></select>
-        </label>
+        <div class="field">
+          <span class="field-label" id="itemCategoryLabel">カテゴリ</span>
+          <select id="itemCategory" hidden aria-hidden="true"></select>
+          <button id="itemCategoryButton" class="category-select-button" type="button" aria-labelledby="itemCategoryLabel itemCategoryValue" aria-haspopup="dialog" aria-controls="categoryPickerSheet" aria-expanded="false">
+            <span id="itemCategoryValue" class="category-select-value">カテゴリを選択</span>
+          </button>
+        </div>
 
         <details id="itemMore" class="more-fields">
           <summary>詳細・場所・画像・繰り返し</summary>
@@ -1417,6 +1455,22 @@
     </section>
   </div>
 
+  <!-- カテゴリの選択 -->
+  <div id="categoryPickerSheet" class="sheet-backdrop" hidden>
+    <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="categoryPickerTitle">
+      <header class="sheet-head">
+        <h2 id="categoryPickerTitle">カテゴリを選択</h2>
+        <button class="icon-button" type="button" data-close-sheet aria-label="カテゴリ選択を閉じる"><svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+      </header>
+      <div class="category-picker-controls">
+        <label class="field"><span class="visually-hidden">カテゴリ名で検索</span><input id="categoryPickerSearch" type="search" placeholder="カテゴリ名で検索" autocomplete="off" /></label>
+        <div id="categoryParentFilters" class="category-parent-filters" role="group" aria-label="親カテゴリで絞り込む"></div>
+      </div>
+      <p id="categoryPickerStatus" role="status" aria-live="polite"></p>
+      <div class="sheet-body" id="categoryPickerOptions"></div>
+    </section>
+  </div>
+
   <!-- 確認 -->
   <div id="confirmSheet" class="sheet-backdrop" hidden>
     <section class="sheet small" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle" aria-describedby="confirmMessage">
@@ -1441,7 +1495,7 @@
   </div>
 
   <script>
-    const APP_VERSION = "v116";
+    const APP_VERSION = "v117";
     // 保存キーは変更しない。旧版の removeOldStorageKeys() は「todo-calendar-board-v数字」の
     // 自分以外のキーを削除するため、キー名を変えると旧版へ戻した時に新データが消える。
     const STORAGE_KEY = "todo-calendar-board-v96";
@@ -4354,6 +4408,7 @@
         promptResolver = null;
         resolve(null);
       }
+      if (id === "categoryPickerSheet") $("#itemCategoryButton").setAttribute("aria-expanded", "false");
       const returnTo = sheetReturnFocus.get(id);
       sheetReturnFocus.delete(id);
       if (returnTo && typeof returnTo.focus === "function" && document.contains(returnTo)) {
@@ -6092,26 +6147,81 @@
     // ---- 追加・編集シート -------------------------------------------------
     const itemSheet = { mode: "add", id: null, kind: "todo", importance: "中", certaintyId: "confirmed", imageData: "", occurrenceDate: "", occurrenceStart: "", repeatWeekdaysExplicit: false };
 
+    function itemCategoryChoices(selectedChildId = "", fallbackParentId = "") {
+      const choices = flatCategories();
+      if (selectedChildId && selectedChildId !== "__uncategorized__" && !choices.some(choice => choice.childId === selectedChildId)) {
+        // 保存先が削除されていても、カテゴリを変更しない編集では元のIDを保つ。
+        choices.unshift({ parentId: fallbackParentId, parentName: "現在の選択", childId: selectedChildId, childName: "（削除されたカテゴリ）", orphan: true });
+      }
+      if (!choices.some(choice => choice.childId === UNCATEGORIZED_CHILD_ID)) {
+        choices.push({ parentId: UNCATEGORIZED_PARENT_ID, parentName: "未分類", childId: "__uncategorized__", childName: "未分類" });
+      }
+      return choices;
+    }
+
     function renderItemCategoryOptions(selectedChildId, fallbackParentId = "") {
       const select = $("#itemCategory");
-      const options = [];
-      state.parents.forEach(parent => {
-        if (!parent.children.length) return;
-        options.push(`<optgroup label="${escapeHtml(parent.name)}">`);
-        parent.children.forEach(child => options.push(`<option value="${escapeHtml(child.id)}">${escapeHtml(child.name)}</option>`));
-        options.push(`</optgroup>`);
-      });
-      const known = flatCategories().some(category => category.childId === selectedChildId);
-      if (selectedChildId && !known) {
-        // 削除済みカテゴリを参照している項目は、そのまま保持できるようにする
-        options.unshift(`<option value="${escapeHtml(selectedChildId)}" data-orphan-parent="${escapeHtml(fallbackParentId)}">（削除されたカテゴリ）</option>`);
-      }
-      if (!state.parents.some(parent => parent.id === UNCATEGORIZED_PARENT_ID)) {
-        options.push(`<option value="__uncategorized__">未分類</option>`);
-      }
-      select.innerHTML = options.join("");
+      const choices = itemCategoryChoices(selectedChildId, fallbackParentId);
+      select.innerHTML = choices.map(choice => `<option value="${escapeHtml(choice.childId)}" data-parent-name="${escapeHtml(choice.parentName)}" data-child-name="${escapeHtml(choice.childName)}"${choice.orphan ? ` data-orphan-parent="${escapeHtml(choice.parentId)}"` : ""}>${escapeHtml(choice.parentName === choice.childName ? choice.childName : choice.parentName + " / " + choice.childName)}</option>`).join("");
       if (selectedChildId) select.value = selectedChildId;
       if (!select.value && select.options.length) select.selectedIndex = 0;
+      syncItemCategoryButton();
+    }
+
+    function syncItemCategoryButton() {
+      const option = $("#itemCategory").selectedOptions[0];
+      const parent = option?.dataset.parentName || "";
+      const child = option?.dataset.childName || "カテゴリを選択";
+      $("#itemCategoryButton").innerHTML = `${icon("tag")}<span id="itemCategoryValue" class="category-select-value">${parent && parent !== child ? `<span class="category-select-parent">${escapeHtml(parent)}</span>` : ""}<span class="category-select-child">${escapeHtml(child)}</span></span>${icon("down")}`;
+    }
+
+    const categoryPicker = { choices: [], parentId: "" };
+
+    function filterCategoryChoices(choices, query = "", parentId = "") {
+      const terms = normalizeSearchText(query).split(" ").filter(Boolean);
+      return choices.filter(choice => {
+        // 検索するときはすべての親カテゴリから探す。
+        if (!terms.length && parentId && choice.parentId !== parentId) return false;
+        const label = normalizeSearchText(choice.parentName + " " + choice.childName);
+        return terms.every(term => label.includes(term));
+      });
+    }
+
+    function renderCategoryPicker() {
+      const selected = $("#itemCategory").value;
+      const query = $("#categoryPickerSearch").value;
+      const choices = filterCategoryChoices(categoryPicker.choices, query, categoryPicker.parentId);
+      const parents = new Map(categoryPicker.choices.filter(choice => choice.parentId && !choice.orphan).map(choice => [choice.parentId, choice.parentName]));
+      const filters = [{ id: "", name: "すべて" }, ...Array.from(parents, ([id, name]) => ({ id, name }))];
+      $("#categoryParentFilters").innerHTML = filters.map(parent => `<button type="button" data-category-parent="${escapeHtml(parent.id)}" aria-pressed="${categoryPicker.parentId === parent.id}">${escapeHtml(parent.name)}</button>`).join("");
+      const groups = new Map();
+      choices.forEach(choice => {
+        // 削除済みの選択と現存するカテゴリは、親IDが同じでも見出しを分ける。
+        const key = JSON.stringify([choice.parentId, Boolean(choice.orphan)]);
+        if (!groups.has(key)) groups.set(key, { name: choice.parentName, choices: [] });
+        groups.get(key).choices.push(choice);
+      });
+      $("#categoryPickerOptions").innerHTML = Array.from(groups.values(), group => `<section class="category-picker-group"><h3>${escapeHtml(group.name)}</h3><div class="category-choice-grid">${group.choices.map(choice => `<button type="button" class="category-choice" data-category-choice="${escapeHtml(choice.childId)}" aria-label="${escapeHtml(choice.parentName + " / " + choice.childName)}" aria-pressed="${choice.childId === selected}"><span>${escapeHtml(choice.childName)}</span><span class="category-choice-mark" aria-hidden="true">${choice.childId === selected ? "✓" : ""}</span></button>`).join("")}</div></section>`).join("") || `<p class="category-picker-empty">一致するカテゴリがありません。</p>`;
+      $("#categoryPickerStatus").textContent = `${choices.length}件のカテゴリ`;
+    }
+
+    function openCategoryPicker() {
+      const select = $("#itemCategory");
+      categoryPicker.choices = itemCategoryChoices(select.value, select.selectedOptions[0]?.dataset.orphanParent || "");
+      categoryPicker.parentId = "";
+      $("#categoryPickerSearch").value = "";
+      renderCategoryPicker();
+      $("#itemCategoryButton").setAttribute("aria-expanded", "true");
+      // 開いた直後はキーボードを出さず、カテゴリのボタンを見せる。
+      openSheet("categoryPickerSheet");
+    }
+
+    function chooseItemCategory(childId) {
+      const select = $("#itemCategory");
+      if (!Array.from(select.options).some(option => option.value === childId)) return;
+      select.value = childId;
+      syncItemCategoryButton();
+      closeSheet("categoryPickerSheet");
     }
 
     function renderQuickDates() {
@@ -7559,6 +7669,33 @@
       });
 
       // 追加・編集シート
+      $("#itemCategoryButton").addEventListener("click", openCategoryPicker);
+      $("#categoryPickerSearch").addEventListener("input", () => {
+        categoryPicker.parentId = "";
+        renderCategoryPicker();
+      });
+      $("#categoryParentFilters").addEventListener("click", event => {
+        const button = event.target.closest("[data-category-parent]");
+        if (!button) return;
+        categoryPicker.parentId = button.dataset.categoryParent;
+        $("#categoryPickerSearch").value = "";
+        renderCategoryPicker();
+      });
+      $("#categoryPickerOptions").addEventListener("click", event => {
+        const button = event.target.closest("[data-category-choice]");
+        if (button) chooseItemCategory(button.dataset.categoryChoice);
+      });
+      $("#categoryPickerSheet").addEventListener("keydown", event => {
+        if (event.key !== "Tab") return;
+        const controls = $$("button, input", $("#categoryPickerSheet")).filter(control => !control.disabled && control.getClientRects().length);
+        const first = controls[0], last = controls[controls.length - 1];
+        if (!first) return;
+        if (event.shiftKey && (document.activeElement === first || document.activeElement.matches(".sheet"))) {
+          event.preventDefault(); last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault(); first.focus();
+        }
+      });
       $$("[data-item-kind]").forEach(button => button.addEventListener("click", () => setItemKind(button.dataset.itemKind)));
       $("#itemImportance").addEventListener("click", event => {
         const button = event.target.closest("[data-importance]");
