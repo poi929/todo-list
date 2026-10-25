@@ -1496,7 +1496,7 @@
   </div>
 
   <script>
-    const APP_VERSION = "v119";
+    const APP_VERSION = "v120";
     // 保存キーは変更しない。旧版の removeOldStorageKeys() は「todo-calendar-board-v数字」の
     // 自分以外のキーを削除するため、キー名を変えると旧版へ戻した時に新データが消える。
     const STORAGE_KEY = "todo-calendar-board-v96";
@@ -2588,7 +2588,7 @@
     function eventOccurrenceRangeOnDate(todo, dateString) {
       // 保存データ中の予定だけを、データの世代（dataVersion）ごとに記憶する
       const index = itemIndexCache;
-      if (index && index.key === dataVersion + "|" + todayString() && index.eventSet && index.eventSet.has(todo)) {
+      if (index && index.key === itemIndexKey() && index.eventSet && index.eventSet.has(todo)) {
         let perTodo = index.rangeCache.get(todo);
         if (!perTodo) {
           perTodo = new Map();
@@ -3558,7 +3558,12 @@
     }
 
     function isOverdueTodo(todo) {
-      return (todo.kind || "todo") === "todo" && !todo.done && todo.date < todayString();
+      if ((todo.kind || "todo") !== "todo" || todo.done) return false;
+      const today = todayString();
+      if (todo.date !== today) return todo.date < today;
+      // 時刻の指定がない Todo は、その日が終わるまで期限内として扱う。
+      return /^([01]\d|2[0-3]):[0-5]\d$/.test(todo.deadlineTime || "")
+        && minutesFromTime(todo.deadlineTime) <= nowMinutes();
     }
 
     function getCertaintyOption(id) {
@@ -3643,11 +3648,15 @@
 
 
 
-    // 日付ごとの項目一覧のキャッシュ。dataVersion と今日の日付が変わると作り直す。
+    // 締切時刻を過ぎた Todo も拾うため、データ・日付・現在の分が変わると作り直す。
     let itemIndexCache = null;
 
+    function itemIndexKey() {
+      return dataVersion + "|" + todayString() + "|" + nowMinutes();
+    }
+
     function itemIndex() {
-      const key = dataVersion + "|" + todayString();
+      const key = itemIndexKey();
       if (itemIndexCache && itemIndexCache.key === key) return itemIndexCache;
       const todosByDate = new Map();
       const events = [];
@@ -3702,6 +3711,7 @@
 
       if (date === todayString()) {
         const carried = index.overdue
+          .filter(todo => todo.date < date)
           .map(todo => ({ todo, isCarryOver: true }));
         return [...carried, ...base].sort((a, b) => {
           const rankA = a.isCarryOver ? importanceRank("高") : importanceRank(a.todo.importance);
@@ -4604,15 +4614,16 @@
     function viewRenderKey(view) {
       const base = dataVersion + "|" + todayString();
       const bucket = Math.floor(Date.now() / (5 * 60 * 1000));
+      const minute = nowMinutes();
       const narrow = window.innerWidth < 720 ? "n" : "w";
       switch (view) {
-        case "today": return [base, state.selectedDate, bucket, narrow, uiOpenSections.todayOverdueAll, state.showClassesInTimeline].join("|");
+        case "today": return [base, state.selectedDate, minute, narrow, uiOpenSections.todayOverdueAll, state.showClassesInTimeline].join("|");
         case "calendar":
           return [base, state.calendarMode, state.selectedDate, state.weekScheduleCursor, firstDateOfMonth(state.monthCursor || todayString()), narrow,
-            bucket, uiOpenSections.dayTodos, state.calendarMode === "month" ? window.innerWidth + "x" + window.innerHeight : ""].join("|");
+            minute, uiOpenSections.dayTodos, state.calendarMode === "month" ? window.innerWidth + "x" + window.innerHeight : ""].join("|");
         case "todos":
           return [base, state.todoMode, state.boardStart, state.filterParentId, state.filterChildId, state.filterKind, state.categorySearchQuery,
-            JSON.stringify(uiOpenSections), todoDoneLimit, narrow].join("|");
+            JSON.stringify(uiOpenSections), todoDoneLimit, minute, narrow].join("|");
         case "timetable": return [base, bucket, state.activeTimetableId].join("|");
         case "more": return "static";
         case "manage":
@@ -4798,13 +4809,14 @@
       const level = carry ? "高" : (["高", "中", "低"].includes(todo.importance) ? todo.importance : "中");
       const dot = importanceDotColor(level);
       const today = todayString();
+      const overdue = isOverdueTodo(todo);
       const overdueDays = !todo.done && todo.date < today ? dateDiffSigned(todo.date, today) : 0;
-      const due = overdueDays > 0
-        ? `<span class="overdue-text">${overdueDays}日超過</span><span>${escapeHtml(dateLabel(todo.date))}${todo.deadlineTime ? " " + escapeHtml(todo.deadlineTime) : ""}</span>`
+      const due = overdue
+        ? `<span class="overdue-text">${overdueDays > 0 ? overdueDays + "日超過" : "期限超過"}</span><span>${escapeHtml(dateLabel(todo.date))}${todo.deadlineTime ? " " + escapeHtml(todo.deadlineTime) : ""}</span>`
         : `<span>${escapeHtml(options.hideDate ? "" : relativeDateLabel(todo.date))}${todo.deadlineTime ? (options.hideDate ? "" : " ") + escapeHtml(todo.deadlineTime) + "まで" : ""}</span>`;
       const detail = options.showDetail !== false && todo.detail ? `<div class="row-detail">${escapeHtml(todo.detail)}</div>` : "";
       return `
-        <div class="row todo-row ${isDone ? "done" : ""} ${isFailed ? "failed" : ""}" style="--check-color:${overdueDays > 0 ? "var(--danger)" : dot}">
+        <div class="row todo-row ${isDone ? "done" : ""} ${isFailed ? "failed" : ""}" style="--check-color:${overdue ? "var(--danger)" : dot}">
           <button class="check" type="button" data-action="toggle" data-id="${escapeHtml(todo.id)}" aria-label="${isDone && !isFailed ? "未完了に戻す" : "完了にする"}：${escapeHtml(todo.title)}。長押しで失敗を選択" aria-pressed="${isDone && !isFailed}" aria-keyshortcuts="Shift+Enter"></button>
           <div class="row-main" data-action="edit" data-id="${escapeHtml(todo.id)}" role="button" tabindex="0">
             <div class="row-title">${escapeHtml(todo.title || "（題名なし）")}</div>
@@ -4925,6 +4937,7 @@
       const index = itemIndex();
       const overdue = isToday ? index.overdue.slice().sort((a, b) => String(a.date).localeCompare(String(b.date)) || importanceRank(b.importance) - importanceRank(a.importance)) : [];
       const todayTodos = (index.todosByDate.get(today) || []).slice()
+        .filter(todo => !isToday || !isOverdueTodo(todo))
         .sort((a, b) => Number(Boolean(a.done)) - Number(Boolean(b.done)) || String(a.deadlineTime || "99").localeCompare(String(b.deadlineTime || "99")) || importanceRank(b.importance) - importanceRank(a.importance));
       const agenda = agendaItemsForDate(today);
       const classesToday = agenda.filter(item => item.type === "class");
@@ -5047,7 +5060,7 @@
       return pane;
     }
     function calendarPaneKey(mode) {
-      const base = dataVersion + "|" + todayString() + "|" + (window.innerWidth < 720 ? "n" : "w");
+      const base = itemIndexKey() + "|" + (window.innerWidth < 720 ? "n" : "w");
       const bucket = Math.floor(Date.now() / (5 * 60 * 1000));
       if (mode === "day") return [base, state.selectedDate, bucket, uiOpenSections.dayTodos, state.calendarMode === "month" ? window.innerWidth + "x" + window.innerHeight : ""].join("|");
       if (mode === "week") return [base, currentWeekScheduleStart(), bucket].join("|");
@@ -5266,7 +5279,7 @@
       const todo = item.todo;
       const isEvent = todo.kind === "event";
       const done = !isEvent && todo.done;
-      const overdue = !isEvent && !todo.done && todo.date < todayString();
+      const overdue = isOverdueTodo(todo);
       let style;
       if (isEvent) {
         const color = strongColor(certaintyColor(todo.certaintyId));
@@ -5438,7 +5451,7 @@
         const bucket = { overdue: [], today: [], tomorrow: [], week: [], later: [] };
         open.forEach(todo => {
           const diff = dateDiffSigned(today, todo.date);
-          if (diff < 0) bucket.overdue.push(todo);
+          if (isOverdueTodo(todo)) bucket.overdue.push(todo);
           else if (diff === 0) bucket.today.push(todo);
           else if (diff === 1) bucket.tomorrow.push(todo);
           else if (diff <= 6) bucket.week.push(todo);
@@ -5525,7 +5538,7 @@
             const todo = entry.todo;
             const done = todo.done && !entry.isCarryOver;
             const failed = done && todo.failed === true;
-            return `<div class="board-card ${done ? "done" : ""} ${failed ? "failed" : ""} ${entry.isCarryOver ? "overdue" : ""}" style="--dot:${importanceDotColor(entry.isCarryOver ? "高" : todo.importance)}" data-action="edit" data-id="${escapeHtml(todo.id)}" title="${escapeHtml(todo.title)}">
+            return `<div class="board-card ${done ? "done" : ""} ${failed ? "failed" : ""} ${isOverdueTodo(todo) ? "overdue" : ""}" style="--dot:${importanceDotColor(entry.isCarryOver ? "高" : todo.importance)}" data-action="edit" data-id="${escapeHtml(todo.id)}" title="${escapeHtml(todo.title)}">
               <button type="button" class="check" data-action="toggle" data-id="${escapeHtml(todo.id)}" aria-label="${done && !failed ? "未完了に戻す" : "完了にする"}：${escapeHtml(todo.title)}。長押しで失敗を選択" aria-pressed="${Boolean(done && !failed)}" aria-keyshortcuts="Shift+Enter"></button>
               <span class="bt">${escapeHtml(todo.title)}${failed ? `<span class="todo-failed-label"> 失敗</span>` : ""}</span></div>`;
           }).join("")}</td>`;
