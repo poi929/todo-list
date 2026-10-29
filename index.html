@@ -86,6 +86,7 @@
     #views { padding: 12px 16px calc(var(--tabbar-h) + var(--safe-b) + 96px); }
     .view { display: none; }
     .view.active { display: block; }
+    #todayView { touch-action: pan-y pinch-zoom; }
 
     .topbar {
       position: sticky; top: 0; z-index: 30;
@@ -685,6 +686,7 @@
     .fab-menu .icon { color: var(--accent); }
     .toast {
       position: fixed; left: 50%; transform: translateX(-50%); z-index: 44;
+      touch-action: pan-y pinch-zoom;
       bottom: calc(var(--tabbar-h) + var(--safe-b) + 84px);
       display: flex; align-items: center; gap: 12px; width: max-content; max-width: calc(100% - 32px);
       padding: 10px 10px 10px 16px; border-radius: 12px; background: #1f2430; color: #fff; font-size: 14px;
@@ -1496,7 +1498,7 @@
   </div>
 
   <script>
-    const APP_VERSION = "v120";
+    const APP_VERSION = "v121";
     // 保存キーは変更しない。旧版の removeOldStorageKeys() は「todo-calendar-board-v数字」の
     // 自分以外のキーを削除するため、キー名を変えると旧版へ戻した時に新データが消える。
     const STORAGE_KEY = "todo-calendar-board-v96";
@@ -4494,7 +4496,9 @@
     let toastTimer = null;
     let toastUndo = null;
     let toastTap = null;
+    let toastSequence = 0;
     function showToast(message, undo = null, duration = 5000, onTap = null) {
+      toastSequence += 1;
       const toast = $("#toast");
       $("#toastMessage").textContent = message;
       toastTap = typeof onTap === "function" ? onTap : null;
@@ -4510,6 +4514,7 @@
       toastTimer = setTimeout(hideToast, toastUndo ? duration : 2600);
     }
     function hideToast() {
+      toastSequence += 1;
       clearTimeout(toastTimer);
       $("#toast").hidden = true;
       toastUndo = null;
@@ -7499,25 +7504,66 @@
       navigateFast("calendar");
     }
 
-    function setupSwipe(element, onSwipe) {
-      let startX = 0;
-      let startY = 0;
-      let startTime = 0;
-      let tracking = false;
-      element.addEventListener("touchstart", event => {
-        if (event.touches.length !== 1) { tracking = false; return; }
-        const t = event.touches[0];
-        startX = t.clientX; startY = t.clientY; startTime = Date.now();
-        tracking = !event.target.closest(".board-wrap, .check, input, select, textarea");
-      }, { passive: true });
-      element.addEventListener("touchend", event => {
-        if (!tracking) return;
-        tracking = false;
-        const t = event.changedTouches[0];
-        const dx = t.clientX - startX;
-        const dy = t.clientY - startY;
-        if (Math.abs(dx) > 70 && Math.abs(dy) < 45 && Date.now() - startTime < 600) onSwipe(dx < 0 ? 1 : -1);
-      }, { passive: true });
+    function setupSwipe(element, onSwipe, options = {}) {
+      let gesture = null;
+      let suppressClickUntil = 0;
+      const enabled = options.enabled || (() => !sheetStack.length);
+      const key = options.key || (() => null);
+      const threshold = options.threshold || 70;
+      const cancel = () => { gesture = null; };
+      document.addEventListener("pointerdown", event => {
+        suppressClickUntil = 0;
+        if (gesture && event.pointerId !== gesture.pointerId) cancel();
+      }, true);
+      element.addEventListener("pointerdown", event => {
+        if (event.button !== 0 || event.isPrimary === false || !enabled()) return;
+        if (event.target.closest?.('.board-wrap, .check, input, select, textarea, [contenteditable="true"]')) return;
+        gesture = {pointerId:event.pointerId, x:event.clientX, y:event.clientY,
+          key:key(), horizontal:false};
+      }, true);
+      document.addEventListener("pointermove", event => {
+        if (!gesture || event.pointerId !== gesture.pointerId) return;
+        const dx = Math.abs(event.clientX - gesture.x);
+        const dy = Math.abs(event.clientY - gesture.y);
+        // 一度縦方向に動き始めたら、横へ戻しても日付を変えない。
+        if (!gesture.horizontal && dy > 10 && dy >= dx) { cancel(); return; }
+        if (dx > 10 && dx > dy * 1.5) gesture.horizontal = true;
+        if (gesture.horizontal && event.cancelable) event.preventDefault();
+      }, {passive:false});
+      document.addEventListener("pointerup", event => {
+        if (!gesture || event.pointerId !== gesture.pointerId) return;
+        const start = gesture;
+        cancel();
+        const dx = event.clientX - start.x;
+        const dy = event.clientY - start.y;
+        if (Math.hypot(dx, dy) > 10) suppressClickUntil = Date.now() + 700;
+        if (Math.abs(dx) < threshold || Math.abs(dx) <= Math.abs(dy) * 1.5
+            || !enabled() || key() !== start.key) return;
+        // 指を離した直後のクリックで、編集・完了・元に戻すを実行しない。
+        if (event.cancelable) event.preventDefault();
+        onSwipe(dx < 0 ? 1 : -1);
+      }, {passive:false});
+      document.addEventListener("click", event => {
+        if (Date.now() >= suppressClickUntil || event.detail === 0) return;
+        suppressClickUntil = 0;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }, true);
+      document.addEventListener("pointercancel", cancel);
+      document.addEventListener("scroll", cancel, {capture:true, passive:true});
+      document.addEventListener("visibilitychange", () => { if (document.hidden) cancel(); });
+      window.addEventListener("blur", cancel);
+    }
+
+    function bindSwipeGestures() {
+      setupSwipe($("#todayView"), direction => openDailyOverview(dateOffset(state.selectedDate, direction)), {
+        enabled: () => state.view === "today" && !sheetStack.length && $("#fabMenu").hidden,
+        key: () => state.selectedDate
+      });
+      setupSwipe($("#toast"), hideToast, {
+        threshold:48, enabled:() => !$("#toast").hidden, key:() => toastSequence
+      });
+      setupSwipe($("#calendarBody"), direction => shiftCalendar(direction));
     }
 
     function setupSheetDrag() {
@@ -7547,6 +7593,7 @@
 
     function bindEvents() {
       bindTodoLongPress();
+      bindSwipeGestures();
       document.addEventListener("click", event => {
         if (event.target.closest("[data-close-sheet]")) {
           const backdrop = event.target.closest(".sheet-backdrop");
@@ -7632,7 +7679,6 @@
         state.weekScheduleCursor = value;
         navigateFast("calendar");
       });
-      setupSwipe($("#calendarBody"), direction => shiftCalendar(direction));
 
       // Todo
       $$("[data-filter-kind]").forEach(button => button.addEventListener("click", () => {
