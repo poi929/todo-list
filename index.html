@@ -1105,6 +1105,29 @@
             <input id="importDataFile" type="file" accept="application/json,.json" />
             <button id="importData" class="button" type="button">選んだファイルから復元</button>
           </div>
+          <div class="card" id="githubSyncCard">
+            <h2 class="card-title">GitHub同期</h2>
+            <p class="muted small">ボタンを押したときだけ、非公開リポジトリの data.json に保存・復元します。Museから確認したいときは、先にこの端末から保存してください。</p>
+            <label class="field"><span class="field-label">保存先リポジトリ（所有者／名前）</span><input id="githubSyncRepo" value="poi929/todoboard-data" placeholder="poi929/todoboard-data" autocomplete="off" autocapitalize="none" spellcheck="false" /></label>
+            <label class="field"><span class="field-label">GitHubトークン</span><input id="githubSyncToken" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Fine-grained personal access token" /></label>
+            <label class="field" style="display:flex;flex-direction:row;align-items:center;gap:8px"><input id="githubSyncRemember" type="checkbox" style="width:auto" /><span>この端末にトークンを保存する</span></label>
+            <p class="muted small">保存しない場合は、アプリを開き直すたびに入力します。保存先の設定とトークンは、Todoのデータや書き出しファイルに含めません。</p>
+            <div style="display:flex;flex-wrap:wrap;gap:8px">
+              <button id="githubSyncSave" class="button primary" type="button">GitHubに保存</button>
+              <button id="githubSyncRestore" class="button" type="button">GitHubから復元</button>
+              <button id="githubSyncForget" class="button" type="button">この端末のトークンを消去</button>
+            </div>
+            <div id="githubSyncStatus" class="status-box" role="status" aria-live="polite" style="margin-top:12px;white-space:pre-wrap;overflow-wrap:anywhere">まだGitHubと同期していません。</div>
+            <button id="githubSyncRecovery" class="button" type="button" hidden style="margin-top:10px">GitHub復元前のデータを書き出す</button>
+            <details class="more-fields" style="margin-top:12px">
+              <summary>最初の設定と使い方</summary>
+              <p class="muted small">1. GitHubで保存先を「Private（非公開）」にして作成します。公開リポジトリには保存できません。</p>
+              <p class="muted small">2. Fine-grained personal access tokenを作り、Repository accessは保存先だけ、Contentsは「Read and write」にします。Metadataの読み取り権限も必要です。</p>
+              <p class="muted small">3. この画面にトークンを入力し「GitHubに保存」を押します。別端末では同じ保存先を設定して「GitHubから復元」を押します。データを自動で混ぜる機能はなく、復元すると現在のデータを置き換えます。</p>
+              <p class="muted small">画像も含めて約950KBまで保存できます。Muse側にも、この非公開リポジトリを読み取る許可が必要です。端末に保存したトークンは暗号化されません。</p>
+              <p class="muted small"><a href="https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens" target="_blank" rel="noopener noreferrer">トークンの作り方（GitHub公式）</a></p>
+            </details>
+          </div>
           <div class="card" id="backupCard">
             <h2 class="card-title">端末内の自動バックアップ</h2>
             <p class="muted small">毎日1回、この端末の中にデータを自動で退避します（直近7日分）。インポートや復元の前にも退避します。端末そのものの故障には備えられないため、ファイルへの書き出しも行ってください。</p>
@@ -1498,10 +1521,14 @@
   </div>
 
   <script>
-    const APP_VERSION = "v122";
+    const APP_VERSION = "v123";
     // 保存キーは変更しない。旧版の removeOldStorageKeys() は「todo-calendar-board-v数字」の
     // 自分以外のキーを削除するため、キー名を変えると旧版へ戻した時に新データが消える。
     const STORAGE_KEY = "todo-calendar-board-v96";
+    const GITHUB_SYNC_KEY = "todo-calendar-board-github-sync";
+    const GITHUB_RESTORE_BACKUP_KEY = "todo-calendar-board-pre-github-restore";
+    const GITHUB_SYNC_DEFAULT_REPO = "poi929/todoboard-data";
+    const GITHUB_SYNC_MAX_BYTES = 950000;
     // 退避・画像用の IndexedDB。名前は旧版の削除対象（todo-calendar-board-v数字）に一致しない。
     const IDB_NAME = "todo-calendar-board-store";
     // ローカルストレージの上限の目安（文字数）。ブラウザ実装はおおむね5MiB。
@@ -5836,6 +5863,11 @@
     async function collectUnusedImages() {
       if (!imageStoreAvailable || saveBlocked) return 0;
       const referenced = new Set(state.todos.map(todo => todo.imageId).filter(Boolean));
+      // GitHub復元前の専用退避から参照される画像も保護する。
+      try {
+        const previous = JSON.parse(localStorage.getItem(GITHUB_RESTORE_BACKUP_KEY) || "null");
+        if (Array.isArray(previous?.todos)) previous.todos.forEach(todo => { if (todo?.imageId) referenced.add(todo.imageId); });
+      } catch {}
       try {
         const backups = await listBackups();
         backups.forEach(item => {
@@ -5917,6 +5949,325 @@
       writeUiPrefs({ lastExportAt: new Date().toISOString(), reminderSnoozeUntil: "" });
       setDataStatus(shared ? "バックアップファイルを共有しました。保存先を確認してください。" : "データを書き出しました。ダウンロードフォルダを確認してください。");
       if (state.view === "today") rerenderCurrentView();
+    }
+
+    // ---- GitHub同期（ボタンを押した場合だけ通信する） -----------------------
+    let githubSyncBusy = false;
+    let githubSyncSettings = {};
+
+    function githubSyncError(message) {
+      const error = new Error(message);
+      error.name = "GitHubSyncError";
+      return error;
+    }
+
+    function setGitHubSyncStatus(message, isError = false) {
+      const target = $("#githubSyncStatus");
+      target.textContent = message;
+      target.style.color = isError ? "#9a3412" : "#475569";
+      target.style.borderColor = isError ? "#fed7aa" : "#e2e8f0";
+      target.style.background = isError ? "#fff7ed" : "#f8fafc";
+    }
+
+    function persistGitHubSyncSettings(patch = {}) {
+      const source = { ...githubSyncSettings, ...patch };
+      const next = { repository: $("#githubSyncRepo").value.trim() || GITHUB_SYNC_DEFAULT_REPO,
+        rememberToken: $("#githubSyncRemember").checked };
+      if (next.rememberToken) next.token = $("#githubSyncToken").value.trim();
+      for (const key of ["remoteRepo", "remoteBranch", "remoteSha", "lastAction", "lastActionAt", "sourceExportedAt"]) {
+        if (typeof source[key] === "string") next[key] = source[key];
+      }
+      try {
+        if (!next.rememberToken && githubSyncSettings.token) localStorage.removeItem(GITHUB_SYNC_KEY);
+        localStorage.setItem(GITHUB_SYNC_KEY, JSON.stringify(next));
+      } catch { throw githubSyncError("GitHubの設定をこの端末に保存できませんでした。保存容量とブラウザの設定を確認してください。"); }
+      githubSyncSettings = next;
+      return next;
+    }
+
+    function githubSyncDateLabel(value) {
+      const date = new Date(value);
+      return typeof value === "string" && Number.isFinite(date.getTime())
+        ? date.toLocaleString("ja-JP") : "保存日時不明";
+    }
+
+    function initGitHubSync() {
+      try {
+        const stored = JSON.parse(localStorage.getItem(GITHUB_SYNC_KEY) || "{}");
+        if (!isPlainObject(stored)) throw new Error();
+        githubSyncSettings = stored;
+        $("#githubSyncRepo").value = typeof stored.repository === "string" ? stored.repository : GITHUB_SYNC_DEFAULT_REPO;
+        $("#githubSyncRemember").checked = stored.rememberToken === true;
+        $("#githubSyncToken").value = stored.rememberToken === true && typeof stored.token === "string" ? stored.token : "";
+        $("#githubSyncRecovery").hidden = !localStorage.getItem(GITHUB_RESTORE_BACKUP_KEY);
+        if (stored.lastAction === "restore") {
+          setGitHubSyncStatus(`最後の復元：${githubSyncDateLabel(stored.lastActionAt)}\nGitHubの保存日時：${githubSyncDateLabel(stored.sourceExportedAt)}\n復元前のデータは、下のボタンから書き出せます。`);
+        } else if (stored.lastAction === "save") {
+          setGitHubSyncStatus(`最後のGitHub保存：${githubSyncDateLabel(stored.lastActionAt)}\n保存先：${stored.remoteRepo}/data.json`);
+        }
+      } catch {
+        setGitHubSyncStatus("GitHubの設定を読み込めませんでした。保存先とトークンを入力し直してください。Todoのデータは変更していません。", true);
+      }
+      const saveSettings = () => {
+        try { persistGitHubSyncSettings(); }
+        catch (error) { setGitHubSyncStatus(error.message, true); }
+      };
+      for (const selector of ["#githubSyncRepo", "#githubSyncToken", "#githubSyncRemember"]) {
+        $(selector).addEventListener("change", saveSettings);
+      }
+      $("#githubSyncForget").addEventListener("click", () => {
+        $("#githubSyncToken").value = "";
+        $("#githubSyncRemember").checked = false;
+        try {
+          persistGitHubSyncSettings();
+          setGitHubSyncStatus("この端末のトークンを消去しました。GitHubでのトークン自体の失効は、GitHubの設定から行えます。");
+        } catch (error) { setGitHubSyncStatus(error.message, true); }
+      });
+      $("#githubSyncSave").addEventListener("click", saveToGitHub);
+      $("#githubSyncRestore").addEventListener("click", restoreFromGitHub);
+      $("#githubSyncRecovery").addEventListener("click", exportGitHubRestoreBackup);
+    }
+
+    function githubSyncCredentials() {
+      const repository = $("#githubSyncRepo").value.trim();
+      const token = $("#githubSyncToken").value.trim();
+      if (!/^[a-zA-Z0-9-]+\/[a-zA-Z0-9_.-]+$/.test(repository)
+          || [".", ".."].includes(repository.split("/")[1])) {
+        throw githubSyncError("保存先は「poi929/todoboard-data」のように、所有者／リポジトリ名で入力してください。");
+      }
+      if (!token || /\s/.test(token)) throw githubSyncError("GitHubトークンを入力してください。空白や改行は含めないでください。");
+      persistGitHubSyncSettings();
+      return { repository, token, path: repository.split("/").map(encodeURIComponent).join("/") };
+    }
+
+    async function githubSyncRequest(credentials, path, options = {}) {
+      const method = options.method || "GET";
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
+      try {
+        const response = await fetch("https://api.github.com/repos/" + credentials.path + path, {
+          method, headers: { Accept: "application/vnd.github+json", Authorization: "Bearer " + credentials.token,
+            "X-GitHub-Api-Version": "2026-03-10", ...(method === "PUT" ? { "Content-Type": "application/json" } : {}) },
+          ...(options.body ? { body: JSON.stringify(options.body) } : {}),
+          signal: controller.signal, cache: "no-store", credentials: "omit", redirect: "error", referrerPolicy: "no-referrer"
+        });
+        if (response.status === 404 && options.allowMissing) return null;
+        let data;
+        try { data = await response.json(); } catch { data = null; }
+        if (options.allowMissing && response.status === 409 && data?.message === "Git Repository is empty.") return null;
+        if (!response.ok) {
+          const messages = {
+            401: "トークンが無効か期限切れです。GitHubの設定を確認してください。",
+            403: "GitHubへのアクセスが拒否されました。保存先の選択、Contents権限、利用制限を確認してください。",
+            404: "保存先またはdata.jsonが見つかりません。非公開リポジトリが作成済みか、トークンがその保存先を対象にしているか確認してください。",
+            409: "別の端末などでGitHubの内容が更新されました。自動で上書きせず中止しました。内容を確認してからやり直してください。",
+            422: "GitHubに保存できませんでした。書き込み制限やブランチの設定を確認してください。",
+            429: "GitHubの利用制限に達しました。しばらく待ってからやり直してください。"
+          };
+          throw githubSyncError((messages[response.status] || "GitHubとの通信に失敗しました。しばらく待ってからやり直してください。") + `（HTTP ${response.status}）`);
+        }
+        if (!isPlainObject(data)) throw githubSyncError("GitHubからの応答を確認できませんでした。GitHub側のファイルを確認してください。");
+        return data;
+      } catch (error) {
+        if (error?.name === "GitHubSyncError") throw error;
+        throw githubSyncError(method === "PUT"
+          ? "GitHubへの保存結果を確認できませんでした。通信状況とGitHub側のdata.jsonを確認してからやり直してください。"
+          : "GitHubから取得できませんでした。通信状況と保存先の名前を確認し、もう一度お試しください。");
+      } finally { clearTimeout(timeout); }
+    }
+
+    async function githubSyncRepository(credentials, forWrite = false) {
+      const repo = await githubSyncRequest(credentials, "");
+      if (repo.private !== true || String(repo.full_name).toLowerCase() !== credentials.repository.toLowerCase()) {
+        throw githubSyncError("非公開の保存先であることを確認できないため中止しました。公開リポジトリには保存・復元できません。");
+      }
+      if (forWrite && repo.archived) throw githubSyncError("保存先はアーカイブされているため書き込めません。");
+      if (typeof repo.default_branch !== "string" || !repo.default_branch) throw githubSyncError("保存先の標準ブランチを確認できませんでした。");
+      return repo;
+    }
+
+    function githubSyncFilePath(repo) {
+      return "/contents/data.json?ref=" + encodeURIComponent(repo.default_branch);
+    }
+
+    function githubSyncDecodeFile(file) {
+      if (file.type !== "file" || file.path !== "data.json" || file.encoding !== "base64" || typeof file.content !== "string") {
+        throw githubSyncError("data.jsonを通常のJSONファイルとして読み取れませんでした。");
+      }
+      if (file.size > GITHUB_SYNC_MAX_BYTES || file.content.length > 1400000) {
+        throw githubSyncError("data.jsonが大きすぎます。画像を含めて約950KB以内にしてください。");
+      }
+      try {
+        const binary = atob(file.content.replace(/\s/g, ""));
+        if (binary.length > GITHUB_SYNC_MAX_BYTES) throw new Error();
+        return new TextDecoder("utf-8", { fatal: true }).decode(Uint8Array.from(binary, character => character.charCodeAt(0)));
+      } catch { throw githubSyncError("data.jsonの文字コードまたはサイズを確認できませんでした。UTF-8のJSONファイルを使用してください。"); }
+    }
+
+    function githubSyncEncode(text) {
+      const bytes = new TextEncoder().encode(text);
+      if (bytes.length > GITHUB_SYNC_MAX_BYTES) throw githubSyncError("画像を含めたデータが約950KBを超えています。画像などを減らすか、ファイルへの書き出しを使ってください。");
+      let binary = "";
+      for (let offset = 0; offset < bytes.length; offset += 8192) binary += String.fromCharCode(...bytes.subarray(offset, offset + 8192));
+      return btoa(binary);
+    }
+
+    function githubSyncCheckLocal() {
+      if (saveBlocked || lastSaveError) throw githubSyncError("端末内の保存に問題があるため同期を中止しました。画面上部の案内を確認してください。");
+    }
+
+    async function githubSyncPayload() {
+      githubSyncCheckLocal();
+      await loadImageCache();
+      if (imageMigrationRunning) throw githubSyncError("画像を準備中です。少し待ってから保存してください。");
+      if (!saveState({ silent: true })) throw githubSyncError("現在のデータを端末に保存できなかったため、GitHubへの保存を中止しました。");
+      const missing = state.todos.some(todo => todo.imageId && !imageCache.has(todo.imageId) && !safeImageSrc(todo.imageData));
+      if (missing) throw githubSyncError("読み込めない参考画像があるため、GitHubへの保存を中止しました。画像の表示を確認してください。");
+      return { app: "Todo Calendar Board " + APP_VERSION, storageKey: STORAGE_KEY,
+        exportedAt: new Date().toISOString(), state: exportableState() };
+    }
+
+    async function runGitHubSync(operation, action) {
+      if (githubSyncBusy) return false;
+      githubSyncBusy = true;
+      const controls = ["#githubSyncRepo", "#githubSyncToken", "#githubSyncRemember", "#githubSyncSave", "#githubSyncRestore", "#githubSyncForget", "#githubSyncRecovery"];
+      controls.forEach(selector => { $(selector).disabled = true; });
+      $("#githubSyncCard").setAttribute("aria-busy", "true");
+      setGitHubSyncStatus(operation + "中…");
+      try {
+        githubSyncCheckLocal();
+        return await action(githubSyncCredentials());
+      } catch (error) {
+        setGitHubSyncStatus(error?.name === "GitHubSyncError" ? error.message : "処理を完了できませんでした。端末の保存容量や通信状況を確認してください。", true);
+        return false;
+      } finally {
+        githubSyncBusy = false;
+        controls.forEach(selector => { $(selector).disabled = false; });
+        $("#githubSyncCard").setAttribute("aria-busy", "false");
+      }
+    }
+
+    function saveToGitHub() {
+      return runGitHubSync("GitHubへの保存", async credentials => {
+        const repo = await githubSyncRepository(credentials, true);
+        const existing = await githubSyncRequest(credentials, githubSyncFilePath(repo), { allowMissing: true });
+        if (existing) {
+          const text = githubSyncDecodeFile(existing);
+          if (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/i.test(existing.sha || "")) throw githubSyncError("GitHub上のファイルの版を確認できなかったため、上書きしませんでした。");
+          if (githubSyncSettings.remoteRepo !== credentials.repository || githubSyncSettings.remoteBranch !== repo.default_branch || githubSyncSettings.remoteSha !== existing.sha) {
+            let exportedAt;
+            try { exportedAt = JSON.parse(text).exportedAt; } catch {}
+            const answer = await confirmDialog({ title: "GitHubのデータを上書きしますか？",
+              message: `保存先：${credentials.repository}/data.json\nGitHubの保存日時：${githubSyncDateLabel(exportedAt)}\n\n別の端末で保存されたデータの可能性があります。この端末の現在のデータで置き換えます。`,
+              buttons: [{ label: "キャンセル", value: null }, { label: "上書きして保存", value: true, style: "primary" }] });
+            if (answer !== true) { setGitHubSyncStatus("GitHubへの保存を取り消しました。"); return false; }
+          }
+        }
+        const payload = await githubSyncPayload();
+        const content = githubSyncEncode(JSON.stringify(payload, null, 2));
+        const result = await githubSyncRequest(credentials, "/contents/data.json", { method: "PUT", body: {
+          message: "TodoBoard data sync", content, branch: repo.default_branch, ...(existing ? { sha: existing.sha } : {})
+        } });
+        if (!result.content?.sha) throw githubSyncError("GitHubから保存完了の情報を受け取れませんでした。GitHub側のdata.jsonを確認してください。");
+        try {
+          persistGitHubSyncSettings({ remoteRepo: credentials.repository, remoteBranch: repo.default_branch, remoteSha: result.content.sha,
+            lastAction: "save", lastActionAt: payload.exportedAt, sourceExportedAt: payload.exportedAt });
+        } catch {
+          setGitHubSyncStatus(`GitHubの ${credentials.repository}/data.json に保存しました。ただし、この端末に保存履歴を記録できませんでした。`, true);
+          return true;
+        }
+        setGitHubSyncStatus(`${credentials.repository}/data.json に保存しました。\n保存日時：${githubSyncDateLabel(payload.exportedAt)}`);
+        return true;
+      });
+    }
+
+    function rollbackGitHubSyncSettings(raw) {
+      try {
+        if (raw === null) localStorage.removeItem(GITHUB_SYNC_KEY);
+        else localStorage.setItem(GITHUB_SYNC_KEY, raw);
+        githubSyncSettings = JSON.parse(raw || "{}");
+      } catch {
+        // 失敗した復元を「成功」と表示する履歴だけは残さない。
+        try { localStorage.removeItem(GITHUB_SYNC_KEY); } catch {}
+        githubSyncSettings = {};
+      }
+    }
+
+    function restoreFromGitHub() {
+      return runGitHubSync("GitHubからの取得", async credentials => {
+        const repo = await githubSyncRepository(credentials);
+        const file = await githubSyncRequest(credentials, githubSyncFilePath(repo));
+        let payload, normalized;
+        try {
+          payload = JSON.parse(githubSyncDecodeFile(file));
+          if (!isPlainObject(payload) || !isPlainObject(payload.state)) throw new Error();
+          normalized = normalizeParsedState(payload.state);
+          if (normalized.dropped) throw new Error();
+        } catch (error) {
+          if (error?.name === "GitHubSyncError") throw error;
+          throw githubSyncError("data.jsonのstateを読み込めませんでした。現在のデータは変更していません。");
+        }
+        const summary = summarizeRaw(JSON.stringify(normalized.loaded));
+        const answer = await confirmDialog({ title: "GitHubから復元しますか？",
+          message: `保存先：${credentials.repository}/data.json\n保存日時：${githubSyncDateLabel(payload.exportedAt)}\nTodo ${summary.todos}件・予定 ${summary.events}件・授業 ${summary.classes}件\n\n現在のデータを置き換えて再読み込みします。置き換える前のデータは、この端末に退避します。`,
+          buttons: [{ label: "キャンセル", value: null }, { label: "復元する", value: true, style: "primary" }] });
+        if (answer !== true) { setGitHubSyncStatus("復元を取り消しました。現在のデータは変更していません。"); return false; }
+        flushSave();
+        githubSyncCheckLocal();
+        const currentRaw = localStorage.getItem(STORAGE_KEY);
+        if (!currentRaw) throw githubSyncError("現在のデータを退避できないため、復元を中止しました。");
+        // 既存の退避一覧にも登録する。使えない環境では専用キーの退避を使う。
+        try { await backupRawToIdb(currentRaw, "GitHubから復元する前の自動退避"); } catch {}
+        flushSave();
+        githubSyncCheckLocal();
+        if (localStorage.getItem(STORAGE_KEY) !== currentRaw) throw githubSyncError("処理中にこの端末のデータが変わったため復元を中止しました。内容を確認し、もう一度お試しください。");
+        const raw = JSON.stringify(payload.state);
+        const previousSettings = localStorage.getItem(GITHUB_SYNC_KEY);
+        try {
+          localStorage.setItem(GITHUB_RESTORE_BACKUP_KEY, currentRaw);
+          if (localStorage.getItem(GITHUB_RESTORE_BACKUP_KEY) !== currentRaw) throw new Error();
+          $("#githubSyncRecovery").hidden = false;
+          persistGitHubSyncSettings({ remoteRepo: credentials.repository, remoteBranch: repo.default_branch, remoteSha: file.sha,
+            lastAction: "restore", lastActionAt: new Date().toISOString(), sourceExportedAt: typeof payload.exportedAt === "string" ? payload.exportedAt : "" });
+          localStorage.removeItem(NAV_STORAGE_KEY);
+        } catch {
+          rollbackGitHubSyncSettings(previousSettings);
+          throw githubSyncError("復元前のデータや復元履歴を端末内に保存できなかったため、中止しました。現在のデータは変更していません。");
+        }
+        clearTimeout(saveTimer);
+        saveTimer = null;
+        savePending = false;
+        saveBlocked = true; // pagehide等が再読み込み直前の古いstateを書き戻すことを防ぐ。
+        try {
+          // payload.storageKeyには書かない。loadStateが最優先で読む現行キーを更新する。
+          localStorage.setItem(STORAGE_KEY, raw);
+        } catch {
+          saveBlocked = false;
+          rollbackGitHubSyncSettings(previousSettings);
+          throw githubSyncError("復元データを端末に保存できませんでした。現在のデータは変更していません。復元前の退避データも残しています。");
+        }
+        setGitHubSyncStatus("GitHubから復元しました。画面を再読み込みします。復元前のデータは端末内に退避しています。");
+        try { location.reload(); }
+        catch { setGitHubSyncStatus("復元データを保存しました。アプリを再読み込みしてください。復元前のデータは端末内に退避しています。"); }
+        return true;
+      });
+    }
+
+    async function exportGitHubRestoreBackup() {
+      try {
+        const raw = localStorage.getItem(GITHUB_RESTORE_BACKUP_KEY);
+        if (!raw) throw new Error();
+        await loadImageCache();
+        const previous = JSON.parse(raw);
+        if (previous.todos.some(todo => todo.imageId && !imageCache.has(todo.imageId) && !safeImageSrc(todo.imageData))) throw new Error();
+        const exported = { ...previous, todos: previous.todos.map(todo => {
+          const src = todo.imageId && imageCache.get(todo.imageId);
+          return src ? { ...todo, imageData: src } : todo;
+        }) };
+        downloadText(JSON.stringify({ app: "Todo Calendar Board " + APP_VERSION, storageKey: STORAGE_KEY,
+          exportedAt: new Date().toISOString(), state: exported }, null, 2), "todoboard-before-github-restore.json");
+        setGitHubSyncStatus("GitHubから復元する前のデータを書き出しました。");
+      } catch { setGitHubSyncStatus("復元前のデータを書き出せませんでした。端末内の退避一覧も確認してください。", true); }
     }
 
     // ---- 毎日の自動バックアップ（端末内） -----------------------------------
@@ -7931,6 +8282,7 @@
       $("#promptInput").addEventListener("keydown", event => { if (event.key === "Enter" && !event.isComposing) submitPrompt(); });
 
       // データ
+      initGitHubSync();
       $("#exportData").addEventListener("click", async () => {
         await exportData();
         renderDataView();
