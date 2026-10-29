@@ -1498,7 +1498,7 @@
   </div>
 
   <script>
-    const APP_VERSION = "v121";
+    const APP_VERSION = "v122";
     // 保存キーは変更しない。旧版の removeOldStorageKeys() は「todo-calendar-board-v数字」の
     // 自分以外のキーを削除するため、キー名を変えると旧版へ戻した時に新データが消える。
     const STORAGE_KEY = "todo-calendar-board-v96";
@@ -4932,6 +4932,33 @@
     }
 
     // ---- 今日 -----------------------------------------------------------
+    function nextAgendaCardHtml(agenda, dateString, type) {
+      if (dateString !== todayString()) return "";
+      const now = nowMinutes();
+      const timed = agenda.filter(item => item.type === type && !item.allDay);
+      const current = timed.find(item => item.start <= now && now < item.end);
+      const focus = current || timed.find(item => item.start > now);
+      if (!focus) return "";
+      const item = focus.item;
+      const isClass = type === "class";
+      const label = isClass ? "授業" : "予定";
+      const tint = isClass ? classPresetColor(item.colorKey) : certaintyColor(item.certaintyId);
+      const action = isClass ? (item.isMakeupClass ? "makeup" : "class") : "edit";
+      const location = isClass ? item.room : item.location;
+      const remain = current
+        ? `${label}中・${timeText24(focus.end)}まで`
+        : (focus.start - now <= 180 ? `あと${focus.start - now}分` : `${timeText24(focus.start)}から`);
+      return `
+        <button type="button" class="next-class${isClass ? "" : " next-event"}" data-action="${action}" data-id="${escapeHtml(item.id)}" data-date="${escapeHtml(dateString)}">
+          <span class="bar" style="--bar:${strongColor(tint)}"></span>
+          <span>
+            <span class="label">${current ? "いまの" : "次の"}${label}</span>
+            <span class="title" style="display:block">${escapeHtml(item.title || label)}</span>
+            <span class="meta" style="display:block">${escapeHtml(focus.startText)}〜${escapeHtml(focus.endText)}${location ? "・" + escapeHtml(location) : ""}　<span class="remain">${escapeHtml(remain)}</span></span>
+          </span>
+        </button>`;
+    }
+
     function renderToday() {
       const today = normalizeDateString(state.selectedDate);
       const isToday = today === todayString();
@@ -4948,27 +4975,9 @@
       const classesToday = agenda.filter(item => item.type === "class");
       const openToday = todayTodos.filter(todo => !todo.done);
 
-      // 次の授業（授業中なら現在の授業）
-      const current = classesToday.find(item => item.start <= now && now < item.end);
-      const next = classesToday.find(item => item.start > now);
-      const focus = isToday ? (current || next) : null;
-      let nextClassHtml = "";
-      if (focus) {
-        const cls = focus.item;
-        const tint = classPresetColor(cls.colorKey);
-        const remain = current
-          ? `授業中・${timeText24(focus.end)}まで`
-          : (focus.start - now <= 180 ? `あと${focus.start - now}分` : `${timeText24(focus.start)}から`);
-        nextClassHtml = `
-          <button type="button" class="next-class" data-action="${cls.isMakeupClass ? "makeup" : "class"}" data-id="${escapeHtml(cls.id)}" data-date="${escapeHtml(today)}">
-            <span class="bar" style="--bar:${strongColor(tint)}"></span>
-            <span>
-              <span class="label">${current ? "いまの授業" : "次の授業"}</span>
-              <span class="title" style="display:block">${escapeHtml(cls.title || "授業")}</span>
-              <span class="meta" style="display:block">${escapeHtml(focus.startText)}〜${escapeHtml(focus.endText)}${cls.room ? "・" + escapeHtml(cls.room) : ""}　<span class="remain">${escapeHtml(remain)}</span></span>
-            </span>
-          </button>`;
-      }
+      // 授業と普通の予定を、それぞれ現在進行中・次の開始の順で案内する。
+      const nextClassHtml = nextAgendaCardHtml(agenda, today, "class");
+      const nextEventHtml = nextAgendaCardHtml(agenda, today, "event");
 
       // 時刻順の一覧。現在時刻の位置に線を入れる。
       let agendaHtml = "";
@@ -5014,6 +5023,7 @@
         <div class="today-layout">
           <div>
             ${nextClassHtml}
+            ${nextEventHtml}
             <div class="section">
               <div class="section-head">
                 <h2 class="section-title">${isToday ? "今日" : "この日"}のスケジュール</h2>
