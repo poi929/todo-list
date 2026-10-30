@@ -257,6 +257,9 @@
       display: flex; flex-direction: column; justify-content: center;
     }
     .row-main:active { background: rgba(16, 24, 40, .03); }
+    .row-body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+    .map-link { display: inline-flex; align-items: center; align-self: flex-start; min-height: 36px; color: var(--accent); font-size: 13px; text-decoration: underline; text-underline-offset: 3px; overflow-wrap: anywhere; }
+    .row-body > .map-link { margin: -4px 12px 4px 4px; }
     .row-title { font-size: 15px; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
     .row-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 10px; margin-top: 3px; color: var(--muted); font-size: 12.5px; }
     .row-meta .sep { color: var(--line-2); }
@@ -1221,9 +1224,15 @@
         </div>
 
         <details id="itemMore" class="more-fields">
-          <summary>詳細・場所・画像・繰り返し</summary>
+          <summary>詳細・場所・地図・画像・繰り返し</summary>
           <label class="field"><span class="field-label">詳細</span><textarea id="itemDetail" placeholder="内容、提出場所、注意点など"></textarea></label>
           <label class="field" id="itemLocationField"><span class="field-label">場所</span><input id="itemLocation" placeholder="例：5号館、オンライン" /></label>
+          <div class="field" id="itemMapUrlField">
+            <label class="field-label" for="itemMapUrl">Google マップのURL（任意）</label>
+            <input id="itemMapUrl" type="url" inputmode="url" placeholder="https://maps.app.goo.gl/…" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="itemMapUrlError" />
+            <p id="itemMapUrlError" class="field-error" role="alert" hidden>https:// または http:// で始まるURLを入力してください。</p>
+            <a id="itemMapOpen" class="map-link" target="_blank" rel="noopener noreferrer" hidden>Google マップで開く</a>
+          </div>
           <div id="itemRepeatFields" class="two-col">
             <label class="field">
               <span class="field-label">繰り返し</span>
@@ -1535,7 +1544,7 @@
   </div>
 
   <script>
-    const APP_VERSION = "v125";
+    const APP_VERSION = "v126";
     // 保存キーは変更しない。旧版の removeOldStorageKeys() は「todo-calendar-board-v数字」の
     // 自分以外のキーを削除するため、キー名を変えると旧版へ戻した時に新データが消える。
     const STORAGE_KEY = "todo-calendar-board-v96";
@@ -2864,6 +2873,19 @@
       return /^data:image\/(png|jpe?g|webp|gif);base64,[a-zA-Z0-9+/=]+$/.test(text) ? text : "";
     }
 
+    function safeMapUrl(value) {
+      if (typeof value !== "string" || !value.trim()) return "";
+      try {
+        const url = new URL(value.trim());
+        return ["https:", "http:"].includes(url.protocol) && !url.username && !url.password ? url.href : "";
+      } catch { return ""; }
+    }
+
+    function mapLinkHtml(todo) {
+      const url = safeMapUrl(todo.mapUrl);
+      return url ? `<a class="map-link" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" aria-label="${escapeHtml(todo.title || "この項目")}の地図を開く">Google マップで開く</a>` : "";
+    }
+
 
 
 
@@ -3115,6 +3137,7 @@
           endTime: typeof todo.endTime === "string" ? todo.endTime : "",
           deadlineTime: typeof todo.deadlineTime === "string" ? todo.deadlineTime : "",
           location: typeof todo.location === "string" ? todo.location : "",
+          mapUrl: safeMapUrl(todo.mapUrl),
           certaintyId,
           repeatMode,
           repeatUntil,
@@ -4868,7 +4891,7 @@
       return `
         <div class="row todo-row ${isDone ? "done" : ""} ${isFailed ? "failed" : ""}" style="--check-color:${overdue ? "var(--danger)" : dot}">
           <button class="check" type="button" data-action="toggle" data-id="${escapeHtml(todo.id)}" aria-label="${isDone && !isFailed ? "未完了に戻す" : "完了にする"}：${escapeHtml(todo.title)}。長押しで失敗を選択" aria-pressed="${isDone && !isFailed}" aria-keyshortcuts="Shift+Enter"></button>
-          <div class="row-main" data-action="edit" data-id="${escapeHtml(todo.id)}" role="button" tabindex="0">
+          <div class="row-body"><div class="row-main" data-action="edit" data-id="${escapeHtml(todo.id)}" role="button" tabindex="0">
             <div class="row-title">${escapeHtml(todo.title || "（題名なし）")}</div>
             <div class="row-meta">
               ${isFailed ? `<span class="todo-failed-label">失敗</span>` : ""}
@@ -4876,9 +4899,10 @@
               ${due}
               ${todoRepeatMode(todo) !== "none" ? `<span>${escapeHtml(repeatFrequencyLabel(todo))}</span>` : ""}
               ${options.hideCategory ? "" : `<span>${escapeHtml(categoryLabelFor(todo))}</span>`}
+              ${todo.location ? `<span>${escapeHtml(todo.location)}</span>` : ""}
             </div>
             ${detail}
-          </div>
+          </div>${mapLinkHtml(todo)}</div>
           ${todoThumbHtml(todo)}
         </div>`;
     }
@@ -4916,7 +4940,7 @@
         <div class="row event-row ${nowPast ? "past" : ""}">
           ${timeCol}
           <div class="bar" style="--bar:${strongColor(tint)}"></div>
-          <div class="row-main" data-action="edit" data-id="${escapeHtml(todo.id)}" data-date="${escapeHtml(dateString)}" role="button" tabindex="0">
+          <div class="row-body"><div class="row-main" data-action="edit" data-id="${escapeHtml(todo.id)}" data-date="${escapeHtml(dateString)}" role="button" tabindex="0">
             <div class="row-title">${escapeHtml(todo.title || "（題名なし）")}</div>
             <div class="row-meta">
               ${certainty}
@@ -4925,7 +4949,7 @@
               ${eventRepeatMode(todo) !== "none" ? `<span>${escapeHtml(repeatFrequencyLabel(todo))}</span>` : ""}
               ${options.showDate ? `<span>${escapeHtml(dateLabel(dateString))}</span>` : ""}
             </div>
-          </div>
+          </div>${mapLinkHtml(todo)}</div>
           ${todoThumbHtml(todo)}
         </div>`;
     }
@@ -6367,7 +6391,9 @@
       if (dropped) throw githubSyncError("読み込めないデータがあるため自動同期を停止しました。");
       const shared = {};
       for (const key of ["parents", "timetables", "classColorPresets", "dayTimetableOverrides", "weekSortMode", "weekOrderChildIds", "weekOrderParentIds", "categoryColors", "importanceColors", "certaintyOptions", "certaintyColors", "showClassesInTimeline", "timelineSettings"]) shared[key] = loaded[key];
-      shared.todos = loaded.todos.map(({ imageId, ...todo }) => {
+      shared.todos = loaded.todos.map(({ imageId, mapUrl, ...todo }) => {
+        // 空の追加項目だけでは、旧版で保存した同期ハッシュを変えない。
+        if (mapUrl) todo.mapUrl = mapUrl;
         // IndexedDBへの移行・復元で変わる端末内IDは、画像本体があれば比較しない。
         if (imageId && !safeImageSrc(todo.imageData)) todo.unavailableImageReference = imageId;
         return todo;
@@ -7083,7 +7109,8 @@
       $("#itemTimeHint").hidden = !isEvent;
       $("#itemImportanceField").hidden = isEvent;
       $("#itemCertaintyField").hidden = !isEvent;
-      $("#itemLocationField").hidden = !isEvent;
+      $("#itemLocationField").hidden = false;
+      $("#itemMapUrlField").hidden = false;
       $("#itemRepeatFields").hidden = false;
       if (isEvent) {
         const start = $("#itemDate").value || todayString();
@@ -7169,6 +7196,15 @@
       return todayString();
     }
 
+    function updateItemMapLink() {
+      const url = safeMapUrl($("#itemMapUrl").value);
+      const link = $("#itemMapOpen");
+      link.hidden = !url;
+      if (url) link.setAttribute("href", url); else link.removeAttribute("href");
+      $("#itemMapUrlError").hidden = true;
+      $("#itemMapUrl").setAttribute("aria-invalid", "false");
+    }
+
     function openItemSheet({ id = null, kind = "todo", date = "", childId = "", occurrenceDate = "" } = {}) {
       const todo = id ? state.todos.find(item => item.id === id) : null;
       if (id && !todo) return;
@@ -7179,6 +7215,8 @@
       $("#itemTitle").value = todo ? todo.title : "";
       $("#itemDetail").value = todo ? (todo.detail || "") : "";
       $("#itemLocation").value = todo ? (todo.location || "") : "";
+      $("#itemMapUrl").value = todo ? safeMapUrl(todo.mapUrl) : "";
+      updateItemMapLink();
       const startDate = todo ? todo.date : (date || defaultAddDate());
       $("#itemDate").value = startDate;
       $("#itemEndDate").value = todo && todo.kind === "event" ? eventEndDate(todo) : startDate;
@@ -7196,7 +7234,7 @@
       const lastChild = readUiPrefs().lastChildId;
       const preferredChild = todo ? todo.childId : (childId || (flatCategories().some(c => c.childId === lastChild) ? lastChild : flatCategories()[0]?.childId || ""));
       renderItemCategoryOptions(preferredChild, todo ? todo.parentId : "");
-      const hasMore = Boolean(todo && (todo.detail || todo.location || todoImageSrc(todo) || (todo.kind === "event" ? eventRepeatMode(todo) : todoRepeatMode(todo)) !== "none"));
+      const hasMore = Boolean(todo && (todo.detail || todo.location || safeMapUrl(todo.mapUrl) || todoImageSrc(todo) || (todo.kind === "event" ? eventRepeatMode(todo) : todoRepeatMode(todo)) !== "none"));
       $("#itemMore").open = hasMore;
       setItemKind(todo ? todo.kind : kind);
       renderQuickDates();
@@ -7251,6 +7289,15 @@
         $("#itemTitle").focus();
         return;
       }
+      const rawMapUrl = $("#itemMapUrl").value.trim();
+      const mapUrl = safeMapUrl(rawMapUrl);
+      if (rawMapUrl && !mapUrl) {
+        $("#itemMore").open = true;
+        $("#itemMapUrlError").hidden = false;
+        $("#itemMapUrl").setAttribute("aria-invalid", "true");
+        $("#itemMapUrl").focus();
+        return;
+      }
       const kind = itemSheet.kind;
       const { parentId, childId } = readItemCategory();
       if (kind === "todo" && !childId) {
@@ -7279,7 +7326,8 @@
         childId,
         title,
         detail: $("#itemDetail").value.trim(),
-        location: kind === "event" ? $("#itemLocation").value.trim() : "",
+        location: $("#itemLocation").value.trim(),
+        mapUrl,
         date: startDate,
         endDate: kind === "event" ? normalizeEndDateForStart(startDate, $("#itemEndDate").value || startDate) : "",
         startTime: kind === "event" ? ($("#itemStartTime").value || "") : "",
@@ -8623,6 +8671,7 @@
       });
       $("#itemImageRemove").addEventListener("click", () => { setItemImage(""); $("#itemImageFile").value = ""; });
       $("#itemSave").addEventListener("click", saveItemSheet);
+      $("#itemMapUrl").addEventListener("input", updateItemMapLink);
       $("#itemDelete").addEventListener("click", () => {
         const id = itemSheet.id;
         closeSheet("itemSheet");
