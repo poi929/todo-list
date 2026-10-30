@@ -2,11 +2,13 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const { webcrypto } = require('node:crypto');
 const {test} = require('node:test');
 const html = fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8');
 const script = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)][0][1].replace(/\n    initUi\(\);/,'');
 const MAIN='todo-calendar-board-v96', SETTINGS='todo-calendar-board-github-sync';
 const BACKUP='todo-calendar-board-pre-github-restore', REPO='poi929/todoboard-data';
+const AUTO='todo-calendar-board-github-auto-sync';
 // Deliberately not a GitHub token. All API calls below are in-memory fakes.
 const DEMO='test-only-credential';
 const sha='a'.repeat(40), nextSha='b'.repeat(40);
@@ -16,8 +18,10 @@ const file=(text,hash=sha)=>({type:'file',path:'data.json',encoding:'base64',sha
 
 function harness(options={}) {
   const values=options.values || new Map();
-  const nodes=new Map(), timers=new Map(), requests=[], confirmations=[], downloads=[], backups=[];
-  let timerId=0,reloads=0;
+  const nodes=new Map(), timers=new Map(), requests=[], confirmations=[], downloads=[], backups=[], events=new Map();
+  let timerId=0,reloads=0,now=Date.parse('2026-10-30T12:00:00+09:00');
+  const addEvent=(prefix,name,fn)=>{const key=prefix+name;if(!events.has(key))events.set(key,[]);events.get(key).push(fn);};
+  const locks=options.locks||{held:false,async request(name,config,callback){if(this.held)return callback(null);this.held=true;try{return await callback({name});}finally{this.held=false;}}};
   const node=selector=>{
     if(!nodes.has(selector))nodes.set(selector,{value:'',checked:false,hidden:false,disabled:false,
       textContent:'',style:{},attributes:{},listeners:new Map(),classList:{toggle(){}},
@@ -40,32 +44,40 @@ function harness(options={}) {
     const body=JSON.parse(init.body);
     assert.equal(body.branch,'main');assert.equal(body.message,'TodoBoard data sync');
     if(server.file)assert.equal(body.sha,server.file.sha);else assert.equal('sha' in body,false);
-    server.file=file(Buffer.from(body.content,'base64').toString('utf8'),nextSha);
-    return reply(201,{content:{sha:nextSha}});
+    server.revision=(server.revision||0)+1;
+    const revision=server.revision===1?nextSha:server.revision.toString(16).padStart(40,'0');
+    server.file=file(Buffer.from(body.content,'base64').toString('utf8'),revision);
+    return reply(201,{content:{sha:revision}});
   }
-  const context=vm.createContext({console,structuredClone,URL,TextEncoder,TextDecoder,AbortController,btoa,atob,
-    Date:class extends Date {constructor(...args){super(...(args.length?args:['2026-10-30T12:00:00+09:00']));}static now(){return Date.parse('2026-10-30T12:00:00+09:00');}},
-    setTimeout:(fn,ms)=>{const id=++timerId;timers.set(id,{fn,ms});return id;},clearTimeout:id=>timers.delete(id),
-    localStorage,document:{getElementById:()=>null,querySelector:node},window:{innerWidth:390,innerHeight:844},navigator:{},
+  const context=vm.createContext({console,structuredClone,URL,TextEncoder,TextDecoder,AbortController,btoa,atob,crypto:webcrypto,
+    Date:class extends Date {constructor(...args){super(...(args.length?args:[now]));}static now(){return now;}},
+    setTimeout:(fn,ms)=>{const id=++timerId;timers.set(id,{fn,ms,at:now+ms});return id;},clearTimeout:id=>timers.delete(id),
+    localStorage,document:{visibilityState:'visible',addEventListener:(name,fn)=>addEvent('document:',name,fn),getElementById:()=>null,querySelector:node},
+    window:{innerWidth:390,innerHeight:844,addEventListener:(name,fn)=>addEvent('window:',name,fn)},navigator:{onLine:true,...(options.noLocks?{}:{locks})},
     location:{reload:()=>{reloads++;options.onReload?.(context);}},
     fetch:async(url,init)=>{requests.push({url,init});return options.fetch ? options.fetch(url,init,route) : route(url,init);}});
   vm.runInContext(script,context);
   vm.runInContext(`globalThis.api={initGitHubSync,saveToGitHub,restoreFromGitHub,exportGitHubRestoreBackup,
     githubSyncEncode,githubSyncDecodeFile,exportableState,saveState,flushSave,scheduleSave,removeOldStorageKeys,
-    collectUnusedImages,getState:()=>state,setTodos:todos=>{state.todos=todos;dataVersion+=1;},
+    collectUnusedImages,afterStateReplaced,getState:()=>state,setTodos:todos=>{state.todos=todos;dataVersion+=1;},
     setBlocked:value=>saveBlocked=value,setImage:(id,src)=>{imageCache.set(id,src);imageStoreAvailable=true;},
-    flags:()=>({saveBlocked,savePending}),getStorageKey:()=>STORAGE_KEY};`,context);
+    flags:()=>({saveBlocked,savePending}),getStorageKey:()=>STORAGE_KEY,
+    auto:{start:startGitHubAutoSync,enable:enableGitHubAutoSync,run:githubAutoRun,flush:githubAutoFlush,retry:githubAutoRetry,inspect:inspectGitHubAutoRemote,
+      record:()=>githubAuto,comparable:githubAutoComparable,local:githubAutoLocalCanonical,busy:()=>githubSyncBusy,
+      external:()=>githubAutoExternal}};`,context);
   context.renderSystemBanner=()=>{};
   context.loadImageCache=async()=>{};
   context.backupRawToIdb=async(raw,reason)=>{backups.push({raw,reason});if(options.noIdb)throw new Error('unavailable');};
   context.confirmDialog=async config=>{confirmations.push(config);return typeof options.confirm==='function' ? options.confirm(config,context) : options.confirm===undefined?true:options.confirm;};
   context.downloadText=(text,name)=>downloads.push({text,name});
   const api=context.api;
-  if(!values.has(MAIN))assert.equal(api.saveState({silent:true}),true);
+  if(!values.has(MAIN)&&!options.skipInitialSave)assert.equal(api.saveState({silent:true}),true);
   api.initGitHubSync();
   node('#githubSyncToken').value=DEMO;
   const fire=(selector,name)=>{for(const fn of node(selector).listeners.get(name)||[])fn({target:node(selector)});};
-  return {api,context,node,values,localStorage,requests,confirmations,downloads,backups,server,timers,fire,
+  const emit=async(name,event={})=>{for(const fn of events.get(name)||[])await fn(event);};
+  const tick=async(ms)=>{now+=ms;for(let i=0;i<100;i++){const next=[...timers.entries()].filter(([,timer])=>timer.at<=now).sort((a,b)=>a[1].at-b[1].at)[0];if(!next)return;timers.delete(next[0]);await next[1].fn();}throw new Error('timer loop');};
+  return {api,context,node,values,localStorage,requests,confirmations,downloads,backups,server,timers,fire,emit,tick,
     status:()=>node('#githubSyncStatus').textContent,get reloads(){return reloads;}};
 }
 
@@ -375,4 +387,306 @@ test('blocked main storage stops synchronization before any network call',async(
   const h=harness();h.api.setBlocked(true);
   assert.equal(await h.api.saveToGitHub(),false);assert.equal(await h.api.restoreFromGitHub(),false);
   assert.equal(h.requests.length,0);assert.match(h.status(),/端末内の保存/);
+});
+
+const puts=h=>h.requests.filter(request=>request.init.method==='PUT').length;
+const remoteState=h=>JSON.parse(Buffer.from(h.server.file.content,'base64').toString('utf8')).state;
+async function autoReady(options={}) {
+  const h=harness(options);
+  h.api.setTodos([{id:'shared',kind:'todo',title:'original',date:'2026-10-30',importance:'高',done:false}]);
+  await h.api.auto.start();
+  assert.equal(await h.api.saveToGitHub(),true);
+  assert.equal(await h.api.auto.enable(),true);
+  assert.equal(h.api.auto.record().enabled,true);
+  return h;
+}
+function edit(h,title) {h.api.getState().todos[0].title=title;assert.equal(h.api.saveState({silent:true}),true);}
+
+test('auto sync defaults off and a new or old browser cannot upload different local data on enable',async()=>{
+  const source=await autoReady();
+  for(const todos of [[],[{id:'old',title:'stale',date:'2026-10-29'}]]) {
+    const h=harness({server:source.server});h.api.setTodos(todos);await h.api.auto.start();
+    assert.equal(await h.api.auto.enable(),false);assert.equal(h.api.auto.record().enabled,false);
+    assert.equal(h.api.auto.record().paused,'setup');assert.equal(puts(h),0);
+    assert.equal(h.node('#githubAutoRestore').hidden,false);
+    assert.equal(remoteState(source).todos[0].title,'original');
+  }
+});
+
+test('auto setup with no remote file requires an explicit first manual save',async()=>{
+  const h=harness();await h.api.auto.start();assert.equal(await h.api.auto.enable(),false);
+  assert.equal(puts(h),0);assert.equal(h.server.file,null);assert.equal(h.api.auto.record().enabled,false);
+  assert.match(h.node('#githubAutoStatus').textContent,/最初の1回/);
+});
+
+test('auto setup reconciles existing data without making a commit',async()=>{
+  const h=await autoReady();assert.equal(puts(h),1);
+  assert.equal(h.api.auto.record().baseSha,h.server.file.sha);
+  assert.match(h.api.auto.record().baseHash,/^[a-f0-9]{64}$/);
+  assert.equal(h.api.auto.record().pending,false);
+});
+
+test('checking while auto sync is off cannot turn it on',async()=>{
+  const h=await autoReady();h.node('#githubAutoEnabled').checked=false;h.fire('#githubAutoEnabled','change');
+  assert.equal(await h.api.auto.enable({enable:false}),true);assert.equal(h.api.auto.record().enabled,false);assert.equal(puts(h),1);
+});
+
+test('auto debounce sends exactly three seconds after the latest substantive change',async()=>{
+  const h=await autoReady();edit(h,'first');
+  assert.equal(JSON.parse(h.values.get(MAIN)).todos[0].title,'first');
+  assert.equal(h.api.auto.record().pending,true);await h.tick(2000);assert.equal(puts(h),1);
+  edit(h,'last');await h.tick(2999);assert.equal(puts(h),1);
+  await h.tick(1);assert.equal(puts(h),2);assert.equal(remoteState(h).todos[0].title,'last');
+  assert.equal(h.api.auto.record().pending,false);
+});
+
+test('no-change, UI navigation, current-day updates and time passing never create an auto commit',async()=>{
+  const h=await autoReady(),count=puts(h),raw=h.server.file.content;
+  h.api.getState().selectedDate='2026-10-29';h.api.getState().lastKnownToday='2026-10-31';h.api.getState().view='calendar';
+  h.api.getState().filterKind='todo';h.api.getState().categorySearchQuery='search';h.api.saveState();
+  await h.tick(10000);assert.equal(puts(h),count);
+  assert.equal(await h.api.auto.run(),true);assert.equal(puts(h),count);assert.equal(h.server.file.content,raw);
+});
+
+test('changing an item and then undoing it within the debounce avoids a commit',async()=>{
+  const h=await autoReady();edit(h,'changed');edit(h,'original');await h.tick(3000);
+  assert.equal(puts(h),1);assert.equal(h.api.auto.record().pending,false);
+});
+
+test('offline changes persist across restart and are sent only after a fresh remote check',async()=>{
+  const h=await autoReady();h.context.navigator.onLine=false;edit(h,'offline edit');await h.tick(3000);
+  assert.equal(puts(h),1);assert.equal(h.api.auto.record().pending,true);
+  const restarted=harness({values:new Map(h.values),server:h.server});await restarted.api.auto.start();await restarted.tick(0);
+  assert.equal(puts(restarted),1);assert.equal(remoteState(restarted).todos[0].title,'offline edit');
+  assert.equal(restarted.api.auto.record().pending,false);
+});
+
+test('a resumed offline browser detects a newer remote and does not replay an old snapshot',async()=>{
+  const h=await autoReady();h.context.navigator.onLine=false;edit(h,'offline edit');
+  const other=harness({values:new Map(h.values),server:h.server});
+  other.api.getState().todos[0].title='newer elsewhere';
+  assert.equal(await other.api.saveToGitHub(),true);
+  const restarted=harness({values:new Map(h.values),server:h.server});await restarted.api.auto.start();await restarted.tick(0);
+  assert.equal(puts(restarted),0);assert.equal(restarted.api.auto.record().paused,'conflict');
+  assert.equal(restarted.api.getState().todos[0].title,'offline edit');assert.equal(remoteState(h).todos[0].title,'newer elsewhere');
+});
+
+test('remote changes pause a clean browser too without accepting a new baseline',async()=>{
+  const h=await autoReady(),base=h.api.auto.record().baseSha;
+  const payload=JSON.parse(Buffer.from(h.server.file.content,'base64').toString('utf8'));
+  payload.state.todos[0].title='other device';h.server.file=file(JSON.stringify(payload),'c'.repeat(40));
+  assert.equal(await h.api.auto.run(),false);assert.equal(h.api.auto.record().paused,'remote');
+  assert.equal(h.api.auto.record().baseSha,base);assert.equal(puts(h),1);
+  h.api.auto.retry();await h.tick(60000);assert.equal(puts(h),1);
+});
+
+test('remote version changes cannot be bypassed by a newer exportedAt or by retry',async()=>{
+  const h=await autoReady(),base=h.api.auto.record().baseSha;edit(h,'local edit');
+  const payload=JSON.parse(Buffer.from(h.server.file.content,'base64').toString('utf8'));
+  payload.exportedAt='2000-01-01T00:00:00Z';payload.state.todos[0].title='elsewhere';h.server.file=file(JSON.stringify(payload),'c'.repeat(40));
+  await h.tick(3000);assert.equal(h.api.auto.record().paused,'conflict');assert.equal(h.api.auto.record().baseSha,base);
+  h.api.auto.retry();await h.tick(60000);assert.equal(puts(h),1);assert.equal(remoteState(h).todos[0].title,'elsewhere');
+});
+
+test('a concurrent write between GET and PUT stops on HTTP409 and never refreshes the SHA to retry',async()=>{
+  let conflict=false;
+  const h=await autoReady({fetch:async(url,init,route)=>conflict&&init.method==='PUT'?reply(409,{message:DEMO}):route(url,init)});
+  conflict=true;edit(h,'local edit');await h.tick(3000);
+  assert.equal(h.api.auto.record().paused,'conflict');assert.equal(puts(h),2);
+  await h.tick(60000);assert.equal(puts(h),2);assert.equal(remoteState(h).todos[0].title,'original');
+});
+
+test('an auto PUT whose response is lost is reconciled after restart without a duplicate commit',async()=>{
+  let lose=false;
+  const h=await autoReady({fetch:async(url,init,route)=>{const result=await route(url,init);if(lose&&init.method==='PUT')throw new Error(DEMO);return result;}});
+  lose=true;edit(h,'committed despite lost response');await h.tick(3000);
+  assert.ok(h.api.auto.record().inFlight);assert.equal(remoteState(h).todos[0].title,'committed despite lost response');
+  const restarted=harness({values:new Map(h.values),server:h.server});await restarted.api.auto.start();await restarted.tick(0);
+  assert.equal(puts(restarted),0);assert.equal(restarted.api.auto.record().inFlight,null);assert.equal(restarted.api.auto.record().pending,false);
+});
+
+test('a PUT that never reached the server is rechecked before the latest state is retried',async()=>{
+  let lose=false;
+  const h=await autoReady({fetch:async(url,init,route)=>{if(lose&&init.method==='PUT')throw new Error(DEMO);return route(url,init);}});
+  lose=true;edit(h,'first attempt');await h.tick(3000);assert.ok(h.api.auto.record().inFlight);
+  edit(h,'latest offline state');lose=false;await h.api.auto.run();
+  assert.equal(remoteState(h).todos[0].title,'latest offline state');assert.equal(h.api.auto.record().inFlight,null);
+});
+
+test('additional edits while a PUT is pending stay dirty after the first commit',async()=>{
+  let inject=false,h;
+  h=await autoReady({fetch:async(url,init,route)=>{const result=await route(url,init);if(inject&&init.method==='PUT'){inject=false;edit(h,'second edit during upload');}return result;}});
+  inject=true;edit(h,'first sent edit');await h.tick(3000);
+  assert.equal(remoteState(h).todos[0].title,'first sent edit');assert.equal(h.api.auto.record().pending,true);
+  await h.tick(3000);assert.equal(remoteState(h).todos[0].title,'second edit during upload');assert.equal(h.api.auto.record().pending,false);
+});
+
+test('hiding or closing before three seconds bypasses the debounce and attempts a send',async()=>{
+  const h=await autoReady();edit(h,'before close');
+  await h.api.auto.flush();assert.equal(remoteState(h).todos[0].title,'before close');assert.equal(puts(h),2);
+});
+
+test('another tab’s main-data write prevents stale local and remote writes',async()=>{
+  const h=await autoReady();const otherRaw=JSON.stringify({...h.api.getState(),todos:[]});
+  h.values.set(MAIN,otherRaw);h.api.getState().todos[0].title='stale edit';
+  assert.equal(h.api.saveState({silent:true}),false);assert.equal(h.values.get(MAIN),otherRaw);
+  assert.equal(await h.api.auto.run(),false);assert.equal(h.api.auto.external(),true);assert.equal(puts(h),1);
+});
+
+test('another tab’s updated baseline cannot be attached to this tab’s stale data',async()=>{
+  const h=await autoReady();const foreign={...h.api.auto.record(),baseSha:'d'.repeat(40)};
+  h.values.set(AUTO,JSON.stringify(foreign));
+  h.api.getState().todos[0].title='stale';
+  assert.equal(h.api.saveState({silent:true}),false);assert.equal(await h.api.auto.run(),false);assert.equal(puts(h),1);
+  assert.equal(JSON.parse(h.values.get(AUTO)).baseSha,'d'.repeat(40));
+});
+
+test('storage events stop an old tab, and clear events are also detected',async()=>{
+  const h=await autoReady();await h.emit('window:storage',{key:null});
+  assert.equal(h.api.auto.external(),true);assert.equal(await h.api.auto.run(),false);assert.equal(puts(h),1);
+});
+
+test('repository changes disable auto sync and erase the old destination baseline',async()=>{
+  const h=await autoReady();h.node('#githubSyncRepo').value='poi929/different';h.fire('#githubSyncRepo','change');
+  assert.equal(h.api.auto.record().enabled,false);assert.equal(h.api.auto.record().baseSha,undefined);
+  await h.tick(60000);assert.equal(puts(h),1);
+});
+
+test('branch changes or remote file deletion never recreate or overwrite data automatically',async()=>{
+  for(const kind of ['branch','deleted']) {
+    const h=await autoReady();edit(h,'local edit');
+    if(kind==='branch')h.server.repo={private:true,full_name:REPO,default_branch:'different'};else h.server.file=null;
+    await h.tick(3000);assert.equal(puts(h),1);assert.ok(h.api.auto.record().paused);
+    if(kind==='deleted')assert.equal(h.server.file,null);
+  }
+});
+
+test('an unapproved unreadable image pauses auto sync without showing repeated dialogs',async()=>{
+  const h=await autoReady(),confirmations=h.confirmations.length;
+  h.api.getState().todos[0].imageId='new-missing';h.api.saveState();await h.tick(3000);
+  assert.equal(puts(h),1);assert.equal(h.confirmations.length,confirmations);assert.equal(h.api.auto.record().paused,'attention');
+  assert.equal(h.api.getState().todos[0].imageId,'new-missing');
+});
+
+test('a manually approved missing image may be omitted again only for the same item and reference',async()=>{
+  const h=await autoReady();h.api.getState().todos[0].imageId='missing';h.api.saveState();
+  assert.equal(await h.api.saveToGitHub(),true);assert.equal(h.api.auto.record().omissions[0].imageId,'missing');
+  const count=h.confirmations.length;edit(h,'safe repeat omission');await h.tick(3000);
+  assert.equal(remoteState(h).todos[0].title,'safe repeat omission');assert.equal(h.confirmations.length,count);
+  assert.equal(h.api.getState().todos[0].imageId,'missing');
+  h.api.getState().todos[0].imageId='different-missing';h.api.saveState();await h.tick(3000);
+  assert.equal(h.api.auto.record().paused,'attention');assert.equal(h.confirmations.length,count);
+});
+
+test('moving an available image into IndexedDB does not produce a change-only commit',async()=>{
+  const h=await autoReady();h.api.getState().todos[0].imageData='data:image/png;base64,YWJj';h.api.saveState();await h.tick(3000);
+  const count=puts(h);h.api.setImage('local-new-id','data:image/png;base64,YWJj');
+  h.api.getState().todos[0].imageId='local-new-id';h.api.getState().todos[0].imageData='';h.api.saveState();
+  await h.tick(3000);await h.api.auto.run();assert.equal(puts(h),count);
+});
+
+test('an expired token pauses requests and forgetting it never discards unsent changes',async()=>{
+  const h=await autoReady();edit(h,'unsent');h.server.repoStatus=401;await h.tick(3000);
+  assert.equal(h.api.auto.record().paused,'auth');const count=h.requests.length;await h.tick(60000);assert.equal(h.requests.length,count);
+  h.fire('#githubSyncForget','click');assert.equal(h.api.auto.record().pending,true);assert.equal(h.node('#githubSyncToken').value,'');
+});
+
+test('quota failure when writing the durable outbox aborts before PUT while retaining main data',async()=>{
+  let fail=false;const h=await autoReady({failWrite:(key,value)=>fail&&key===AUTO&&Boolean(JSON.parse(value).inFlight)});
+  fail=true;edit(h,'must stay local');await h.tick(3000);
+  assert.equal(puts(h),1);assert.equal(JSON.parse(h.values.get(MAIN)).todos[0].title,'must stay local');assert.ok(h.api.auto.record().paused);
+});
+
+test('auto record and durable outbox never contain credentials or enter exported state',async()=>{
+  let lose=false;const h=await autoReady({fetch:async(url,init,route)=>{if(lose&&init.method==='PUT')throw new Error(DEMO);return route(url,init);}});
+  h.node('#githubSyncRemember').checked=true;h.fire('#githubSyncRemember','change');lose=true;edit(h,'queued');await h.tick(3000);
+  assert.ok(h.api.auto.record().inFlight);assert.equal(h.values.get(AUTO).includes(DEMO),false);
+  assert.equal(JSON.stringify(h.api.exportableState()).includes(DEMO),false);assert.equal(h.values.get(SETTINGS).includes(DEMO),true);
+});
+
+test('a browser without Web Locks can use manual save but cannot enable auto writes',async()=>{
+  const h=harness({noLocks:true});await h.api.auto.start();assert.equal(await h.api.saveToGitHub(),true);
+  assert.equal(await h.api.auto.enable(),false);assert.notEqual(h.api.auto.record().enabled,true);assert.equal(puts(h),1);
+});
+
+test('a newer or malformed remote app version prevents automatic overwrite',async()=>{
+  for(const app of ['Todo Calendar Board v999','other application']) {
+    const h=await autoReady();const payload=JSON.parse(Buffer.from(h.server.file.content,'base64').toString('utf8'));
+    payload.app=app;h.server.file=file(JSON.stringify(payload),'c'.repeat(40));edit(h,'local');await h.tick(3000);
+    assert.equal(puts(h),1);assert.ok(h.api.auto.record().paused);
+  }
+});
+
+test('turning auto sync off cancels the pending timer while preserving the dirty flag',async()=>{
+  const h=await autoReady();edit(h,'unsent');h.node('#githubAutoEnabled').checked=false;h.fire('#githubAutoEnabled','change');
+  await h.tick(60000);assert.equal(puts(h),1);assert.equal(h.api.auto.record().enabled,false);assert.equal(h.api.auto.record().pending,true);
+});
+
+test('auto metadata survives old-version key cleanup',async()=>{
+  const h=await autoReady();const raw=h.values.get(AUTO);h.api.removeOldStorageKeys();assert.equal(h.values.get(AUTO),raw);
+});
+
+test('a missing main key with retained sync settings cannot upload the newly generated example data',async()=>{
+  const source=await autoReady(),values=new Map(source.values);values.delete(MAIN);
+  const h=harness({values,server:source.server,skipInitialSave:true});
+  assert.equal(h.api.auto.record().enabled,false);assert.equal(h.api.auto.record().paused,'setup');
+  h.api.saveState();await h.api.auto.start();await h.tick(60000);
+  assert.equal(puts(h),0);assert.equal(remoteState(h).todos[0].title,'original');
+});
+
+test('failure to persist the missing-main guard also blocks writing example data',async()=>{
+  const source=await autoReady(),values=new Map(source.values);values.delete(MAIN);
+  const h=harness({values,server:source.server,skipInitialSave:true,failWrite:key=>key===AUTO});
+  assert.equal(h.api.saveState({silent:true}),false);assert.equal(values.has(MAIN),false);
+  await h.api.auto.start();assert.equal(await h.api.auto.run(),false);assert.equal(puts(h),0);
+});
+
+test('restoring an external backup disables auto sync before image migration can save it',async()=>{
+  const h=await autoReady();h.api.getState().todos[0].title='old backup';await h.api.afterStateReplaced();h.api.saveState();
+  assert.equal(h.api.auto.record().enabled,false);assert.equal(h.api.auto.record().paused,'setup');
+  await h.tick(60000);assert.equal(puts(h),1);assert.equal(remoteState(h).todos[0].title,'original');
+});
+
+test('a rate limit honors Retry-After and does not retry at the three-second debounce',async()=>{
+  let limited=false;
+  const h=await autoReady({fetch:async(url,init,route)=>limited?{...reply(429,{}),headers:{get:name=>name==='retry-after'?'120':null}}:route(url,init)});
+  limited=true;edit(h,'limited edit');await h.tick(3000);const count=h.requests.length;
+  await h.tick(119999);assert.equal(h.requests.length,count);
+  limited=false;await h.tick(1);assert.equal(puts(h),2);assert.equal(remoteState(h).todos[0].title,'limited edit');
+});
+
+test('a held origin lock prevents concurrent network requests from another tab',async()=>{
+  const h=await autoReady();h.context.navigator.locks.held=true;edit(h,'wait for other tab');await h.tick(3000);
+  assert.equal(puts(h),1);assert.equal(h.api.auto.record().paused,'attention');
+  h.context.navigator.locks.held=false;h.api.auto.retry();await h.tick(0);assert.equal(puts(h),2);
+});
+
+test('continuous changes are sent within sixty seconds instead of postponing forever',async()=>{
+  const h=await autoReady();edit(h,'start');
+  for(let i=0;i<29;i++){await h.tick(2000);edit(h,'edit '+i);}
+  assert.equal(puts(h),1);await h.tick(2000);assert.equal(puts(h),2);
+});
+
+test('a successful GitHub restore establishes its baseline and does not upload again on restart',async()=>{
+  const h=await autoReady(),payload=JSON.parse(Buffer.from(h.server.file.content,'base64').toString('utf8'));
+  payload.state.todos[0].title='other device';h.server.file=file(JSON.stringify(payload),'d'.repeat(40));
+  assert.equal(await h.api.restoreFromGitHub(),true);
+  const restarted=harness({values:new Map(h.values),server:h.server});await restarted.api.auto.start();await restarted.tick(0);
+  assert.equal(puts(restarted),0);assert.equal(restarted.api.getState().todos[0].title,'other device');
+  assert.equal(restarted.api.auto.record().baseSha,'d'.repeat(40));
+});
+
+test('a failed restore main-write rolls back its auto baseline as well as manual history',async()=>{
+  let fail=false;const h=await autoReady({failWrite:key=>fail&&key===MAIN});
+  const raw=h.values.get(AUTO),main=h.values.get(MAIN);fail=true;
+  assert.equal(await h.api.restoreFromGitHub(),false);assert.equal(h.values.get(AUTO),raw);assert.equal(h.values.get(MAIN),main);
+});
+
+test('checking a conflict reads current remote details without unpausing or changing the baseline',async()=>{
+  const h=await autoReady(),base=h.api.auto.record().baseSha;
+  const payload=JSON.parse(Buffer.from(h.server.file.content,'base64').toString('utf8'));
+  payload.state.todos[0].title='other device';h.server.file=file(JSON.stringify(payload),'d'.repeat(40));
+  edit(h,'local conflict');await h.tick(3000);
+  assert.equal(await h.api.auto.inspect(),true);assert.equal(h.api.auto.record().paused,'conflict');
+  assert.equal(h.api.auto.record().baseSha,base);assert.equal(puts(h),1);assert.match(h.status(),/停止したまま/);
 });

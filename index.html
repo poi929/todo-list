@@ -102,6 +102,9 @@
     .top-title { flex: 1; margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .top-actions { display: flex; align-items: center; gap: 4px; }
     .top-back { margin-left: -8px; }
+    .sync-indicator { max-width: 142px; min-height: 32px; padding: 5px 9px; border: 1px solid var(--accent-line); border-radius: 16px; background: var(--accent-soft); color: var(--accent); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .sync-indicator[data-warning="true"] { background: var(--warn-soft); border-color: #f1d39b; color: var(--warn); }
+    #githubSyncCard { scroll-margin-top: calc(var(--topbar-h) + var(--safe-t) + 12px); }
 
     .tabbar {
       position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
@@ -923,6 +926,7 @@
         <button id="topBack" class="icon-button top-back" type="button" aria-label="戻る" hidden><svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m14.5 6-6 6 6 6"/></svg></button>
         <h1 id="topTitle" class="top-title">今日</h1>
         <div class="top-actions">
+          <button id="githubAutoIndicator" class="sync-indicator" type="button" aria-label="GitHubの同期状態を確認" hidden></button>
           <button id="topToday" class="chip-button" type="button" hidden>今日</button>
           <button class="icon-button top-settings" type="button" data-nav="more" aria-label="設定"><svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="17" r="2"/></svg></button>
         </div>
@@ -1107,11 +1111,21 @@
           </div>
           <div class="card" id="githubSyncCard">
             <h2 class="card-title">GitHub同期</h2>
-            <p class="muted small">ボタンを押したときだけ、非公開リポジトリの data.json に保存・復元します。Museから確認したいときは、先にこの端末から保存してください。</p>
+            <p class="muted small">非公開リポジトリの data.json に保存・復元します。自動同期を有効にすると、最後の変更から3秒後に送信します。Museが読めるのは、GitHubへの保存が完了した内容です。</p>
             <label class="field"><span class="field-label">保存先リポジトリ（所有者／名前）</span><input id="githubSyncRepo" value="poi929/todoboard-data" placeholder="poi929/todoboard-data" autocomplete="off" autocapitalize="none" spellcheck="false" /></label>
             <label class="field"><span class="field-label">GitHubトークン</span><input id="githubSyncToken" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Fine-grained personal access token" /></label>
             <label class="field" style="display:flex;flex-direction:row;align-items:center;gap:8px"><input id="githubSyncRemember" type="checkbox" style="width:auto" /><span>この端末にトークンを保存する</span></label>
             <p class="muted small">保存しない場合は、アプリを開き直すたびに入力します。保存先の設定とトークンは、Todoのデータや書き出しファイルに含めません。</p>
+            <div class="status-box" style="margin-bottom:12px">
+              <label style="display:flex;align-items:center;gap:8px"><input id="githubAutoEnabled" type="checkbox" style="width:auto" /><span>この端末で自動同期する</span></label>
+              <p id="githubAutoStatus" class="small" role="status" aria-live="polite" style="white-space:pre-wrap;overflow-wrap:anywhere">自動同期はオフです。</p>
+              <div style="display:flex;flex-wrap:wrap;gap:8px">
+                <button id="githubAutoCheck" class="button" type="button">GitHubの最新状態を確認</button>
+                <button id="githubAutoRetry" class="button" type="button" hidden>同期を再開する</button>
+                <button id="githubAutoRestore" class="button primary" type="button" hidden>GitHubから読み込む</button>
+              </div>
+              <p class="muted small">初回はGitHubの内容を確認します。別の端末で更新されていたら上書きせず停止します。未送信の変更は次回起動時に再確認して送信します。アプリを閉じた後の送信完了は保証されません。</p>
+            </div>
             <div style="display:flex;flex-wrap:wrap;gap:8px">
               <button id="githubSyncSave" class="button primary" type="button">GitHubに保存</button>
               <button id="githubSyncRestore" class="button" type="button">GitHubから復元</button>
@@ -1521,11 +1535,12 @@
   </div>
 
   <script>
-    const APP_VERSION = "v124";
+    const APP_VERSION = "v125";
     // 保存キーは変更しない。旧版の removeOldStorageKeys() は「todo-calendar-board-v数字」の
     // 自分以外のキーを削除するため、キー名を変えると旧版へ戻した時に新データが消える。
     const STORAGE_KEY = "todo-calendar-board-v96";
     const GITHUB_SYNC_KEY = "todo-calendar-board-github-sync";
+    const GITHUB_AUTO_KEY = "todo-calendar-board-github-auto-sync";
     const GITHUB_RESTORE_BACKUP_KEY = "todo-calendar-board-pre-github-restore";
     const GITHUB_SYNC_DEFAULT_REPO = "poi929/todoboard-data";
     const GITHUB_SYNC_MAX_BYTES = 950000;
@@ -3431,6 +3446,7 @@
         renderSystemBanner();
         return false;
       }
+      if (!githubAutoCanSaveLocal()) return false;
       try {
         persistActiveTimetableAliases();
         const serialized = JSON.stringify(state);
@@ -3452,6 +3468,8 @@
           lastKnownUsage = localStorageUsageChars();
         }
         if (hadError || lastKnownUsage.total >= LOCAL_STORAGE_LIMIT_CHARS * 0.8) renderSystemBanner();
+        githubAutoLocalRaw = serialized;
+        githubAutoOnLocalSave();
         return true;
       } catch (error) {
         if (options.silent) {
@@ -4113,7 +4131,7 @@
     function renderAll() {
       normalizeDateChange();
       dataVersion += 1;
-      scheduleSave();
+      if (githubAuto.enabled) saveState(); else scheduleSave();
       saveNavigationState();
       renderViews();
       renderCurrentView();
@@ -5915,6 +5933,11 @@
     }
 
     async function afterStateReplaced() {
+      if (githubAuto.enabled) {
+        githubAutoPause("setup", "ファイルまたは端末内の退避データから復元したため、自動同期を停止しました。GitHubの内容と照合してから有効にしてください。");
+        try { githubAutoWrite({ ...githubAuto, enabled: false, baseSha: "", baseHash: "" }); }
+        catch { githubAuto.paused = "storage"; }
+      }
       await moveInlineImagesToIdb({ backup: false });
     }
 
@@ -5954,6 +5977,17 @@
     // ---- GitHub同期（ボタンを押した場合だけ通信する） -----------------------
     let githubSyncBusy = false;
     let githubSyncSettings = {};
+    let githubAuto = {};
+    let githubAutoRaw = null;
+    let githubAutoLocalRaw = null;
+    let githubAutoReady = false;
+    let githubAutoExternal = false;
+    let githubAutoTimer = null;
+    let githubAutoFirstChange = 0;
+    let githubAutoSeen = "";
+    let githubAutoNotice = "";
+    let githubAutoRetryCount = 0;
+    let githubAutoQuiet = false;
 
     function githubSyncError(message) {
       const error = new Error(message);
@@ -6026,6 +6060,7 @@
       $("#githubSyncSave").addEventListener("click", saveToGitHub);
       $("#githubSyncRestore").addEventListener("click", restoreFromGitHub);
       $("#githubSyncRecovery").addEventListener("click", exportGitHubRestoreBackup);
+      initGitHubAutoSync();
     }
 
     function githubSyncCredentials() {
@@ -6064,15 +6099,24 @@
             422: "GitHubに保存できませんでした。書き込み制限やブランチの設定を確認してください。",
             429: "GitHubの利用制限に達しました。しばらく待ってからやり直してください。"
           };
-          throw githubSyncError((messages[response.status] || "GitHubとの通信に失敗しました。しばらく待ってからやり直してください。") + `（HTTP ${response.status}）`);
+          const failure = githubSyncError((messages[response.status] || "GitHubとの通信に失敗しました。しばらく待ってからやり直してください。") + `（HTTP ${response.status}）`);
+          failure.status = response.status;
+          const retryAfter = Number(response.headers?.get("retry-after"));
+          const resetAt = Number(response.headers?.get("x-ratelimit-reset")) * 1000;
+          failure.retryMs = Math.max(60000, Number.isFinite(retryAfter) ? retryAfter * 1000 : 0,
+            response.headers?.get("x-ratelimit-remaining") === "0" && Number.isFinite(resetAt) ? resetAt - Date.now() : 0);
+          failure.rateLimited = response.status === 429 || response.headers?.get("retry-after") != null || response.headers?.get("x-ratelimit-remaining") === "0";
+          throw failure;
         }
         if (!isPlainObject(data)) throw githubSyncError("GitHubからの応答を確認できませんでした。GitHub側のファイルを確認してください。");
         return data;
       } catch (error) {
         if (error?.name === "GitHubSyncError") throw error;
-        throw githubSyncError(method === "PUT"
+        const failure = githubSyncError(method === "PUT"
           ? "GitHubへの保存結果を確認できませんでした。通信状況とGitHub側のdata.jsonを確認してからやり直してください。"
           : "GitHubから取得できませんでした。通信状況と保存先の名前を確認し、もう一度お試しください。");
+        failure.transient = true;
+        throw failure;
       } finally { clearTimeout(timeout); }
     }
 
@@ -6116,7 +6160,7 @@
       if (saveBlocked || lastSaveError) throw githubSyncError("端末内の保存に問題があるため同期を中止しました。画面上部の案内を確認してください。");
     }
 
-    async function githubSyncPayload() {
+    async function githubSyncPayload({ automatic = false } = {}) {
       githubSyncCheckLocal();
       await loadImageCache();
       if (imageMigrationRunning) throw githubSyncError("画像を準備中です。少し待ってから保存してください。");
@@ -6124,35 +6168,52 @@
       // 確認中に元のstateが変わっても、確認した書き出し内容だけを保存する。
       const exported = JSON.parse(JSON.stringify(exportableState()));
       const missing = exported.todos.filter(todo => todo.imageId && !safeImageSrc(todo.imageData));
+      const omissions = missing.map(todo => ({ todoId: todo.id, imageId: todo.imageId }));
       if (missing.length) {
+        const approved = missing.every(todo => (githubAuto.omissions || []).some(item => item.todoId === todo.id && item.imageId === todo.imageId));
+        if (automatic && !approved) throw githubSyncError("読み込めない参考画像があります。「GitHubに保存」から対象を確認してください。自動同期は一時停止しています。");
+        if (!automatic) {
         const titles = missing.slice(0, 5).map(todo => "・" + String(todo.title || "（題名なし）").slice(0, 80)).join("\n");
         const answer = await confirmDialog({ title: "読み込めない画像を含めずに保存しますか？",
           message: `参考画像を読み込めない項目が${missing.length}件あります。\n${titles}${missing.length > 5 ? "\nほか" + (missing.length - 5) + "件" : ""}\n\n予定・Todoの内容と、読み込める画像は保存できます。読み込めない画像は今回のGitHub保存に含まれず、そのデータを別端末で復元しても表示できません。\n\nこの端末のデータや画像の参照は削除しません。`,
           buttons: [{ label: "キャンセル", value: null }, { label: "画像なしで保存", value: true, style: "primary" }] });
         if (answer !== true) { setGitHubSyncStatus("GitHubへの保存を取り消しました。現在のデータは変更していません。"); return null; }
+        }
         missing.forEach(todo => { delete todo.imageId; todo.imageData = ""; });
       }
       return { payload: { app: "Todo Calendar Board " + APP_VERSION, storageKey: STORAGE_KEY,
-        exportedAt: new Date().toISOString(), state: exported }, omittedImages: missing.length };
+        exportedAt: new Date().toISOString(), state: exported }, omittedImages: missing.length, omissions };
     }
 
-    async function runGitHubSync(operation, action) {
+    async function runGitHubSync(operation, action, { automatic = false } = {}) {
       if (githubSyncBusy) return false;
       githubSyncBusy = true;
-      const controls = ["#githubSyncRepo", "#githubSyncToken", "#githubSyncRemember", "#githubSyncSave", "#githubSyncRestore", "#githubSyncForget", "#githubSyncRecovery"];
+      const controls = ["#githubSyncRepo", "#githubSyncToken", "#githubSyncRemember", "#githubSyncSave", "#githubSyncRestore", "#githubSyncForget", "#githubSyncRecovery", "#githubAutoEnabled", "#githubAutoCheck", "#githubAutoRetry", "#githubAutoRestore"];
       controls.forEach(selector => { $(selector).disabled = true; });
       $("#githubSyncCard").setAttribute("aria-busy", "true");
       setGitHubSyncStatus(operation + "中…");
       try {
         githubSyncCheckLocal();
+        githubAutoAssertCurrent();
+        if (navigator.locks?.request) {
+          return await navigator.locks.request("todo-calendar-board-github-sync", { ifAvailable: true }, async lock => {
+            if (!lock) throw githubSyncError("別のタブで同期中です。処理が終わってから確認してください。");
+            githubAutoAssertCurrent();
+            return action(githubSyncCredentials());
+          });
+        }
+        if (automatic) throw githubSyncError("このブラウザーは安全な自動同期に対応していません。手動保存を使用してください。");
         return await action(githubSyncCredentials());
       } catch (error) {
+        if (automatic) githubAutoHandleError(error);
         setGitHubSyncStatus(error?.name === "GitHubSyncError" ? error.message : "処理を完了できませんでした。端末の保存容量や通信状況を確認してください。", true);
         return false;
       } finally {
         githubSyncBusy = false;
         controls.forEach(selector => { $(selector).disabled = false; });
         $("#githubSyncCard").setAttribute("aria-busy", "false");
+        renderGitHubAutoStatus();
+        if (githubAutoReady && githubAuto.enabled && !githubAuto.paused && githubAuto.pending && !githubAutoTimer) githubAutoSchedule();
       }
     }
 
@@ -6175,13 +6236,14 @@
         const prepared = await githubSyncPayload();
         if (!prepared) return false;
         githubSyncCheckLocal();
-        const { payload, omittedImages } = prepared;
+        const { payload, omittedImages, omissions } = prepared;
         const imageNotice = omittedImages ? `\n読み込めない参考画像${omittedImages}件は含めずに保存しました。この端末のデータは変更していません。` : "";
         const content = githubSyncEncode(JSON.stringify(payload, null, 2));
         const result = await githubSyncRequest(credentials, "/contents/data.json", { method: "PUT", body: {
           message: "TodoBoard data sync", content, branch: repo.default_branch, ...(existing ? { sha: existing.sha } : {})
         } });
         if (!result.content?.sha) throw githubSyncError("GitHubから保存完了の情報を受け取れませんでした。GitHub側のdata.jsonを確認してください。");
+        await githubAutoAccept(repo, credentials.repository, result.content.sha, payload, omissions);
         try {
           persistGitHubSyncSettings({ remoteRepo: credentials.repository, remoteBranch: repo.default_branch, remoteSha: result.content.sha,
             lastAction: "save", lastActionAt: payload.exportedAt, sourceExportedAt: payload.exportedAt });
@@ -6225,6 +6287,7 @@
           message: `保存先：${credentials.repository}/data.json\n保存日時：${githubSyncDateLabel(payload.exportedAt)}\nTodo ${summary.todos}件・予定 ${summary.events}件・授業 ${summary.classes}件\n\n現在のデータを置き換えて再読み込みします。置き換える前のデータは、この端末に退避します。`,
           buttons: [{ label: "キャンセル", value: null }, { label: "復元する", value: true, style: "primary" }] });
         if (answer !== true) { setGitHubSyncStatus("復元を取り消しました。現在のデータは変更していません。"); return false; }
+        const restoreHash = await githubAutoHash(githubAutoComparable(payload.state));
         flushSave();
         githubSyncCheckLocal();
         const currentRaw = localStorage.getItem(STORAGE_KEY);
@@ -6236,6 +6299,7 @@
         if (localStorage.getItem(STORAGE_KEY) !== currentRaw) throw githubSyncError("処理中にこの端末のデータが変わったため復元を中止しました。内容を確認し、もう一度お試しください。");
         const raw = JSON.stringify(payload.state);
         const previousSettings = localStorage.getItem(GITHUB_SYNC_KEY);
+        const previousAuto = githubAutoRaw;
         try {
           localStorage.setItem(GITHUB_RESTORE_BACKUP_KEY, currentRaw);
           if (localStorage.getItem(GITHUB_RESTORE_BACKUP_KEY) !== currentRaw) throw new Error();
@@ -6243,8 +6307,12 @@
           persistGitHubSyncSettings({ remoteRepo: credentials.repository, remoteBranch: repo.default_branch, remoteSha: file.sha,
             lastAction: "restore", lastActionAt: new Date().toISOString(), sourceExportedAt: typeof payload.exportedAt === "string" ? payload.exportedAt : "" });
           localStorage.removeItem(NAV_STORAGE_KEY);
+          githubAutoWrite({ ...githubAuto, repository: credentials.repository, branch: repo.default_branch,
+            baseSha: file.sha, baseHash: restoreHash, pending: false, paused: "", inFlight: null, omissions: [],
+            lastSyncedAt: new Date().toISOString(), lastCheckedAt: new Date().toISOString() });
         } catch {
           rollbackGitHubSyncSettings(previousSettings);
+          githubAutoRollback(previousAuto);
           throw githubSyncError("復元前のデータや復元履歴を端末内に保存できなかったため、中止しました。現在のデータは変更していません。");
         }
         clearTimeout(saveTimer);
@@ -6257,8 +6325,12 @@
         } catch {
           saveBlocked = false;
           rollbackGitHubSyncSettings(previousSettings);
+          githubAutoRollback(previousAuto);
           throw githubSyncError("復元データを端末に保存できませんでした。現在のデータは変更していません。復元前の退避データも残しています。");
         }
+        githubAutoLocalRaw = raw;
+        githubAutoReady = false;
+        githubAutoNotice = "GitHubから復元しました。画面を再読み込みしてください。";
         setGitHubSyncStatus("GitHubから復元しました。画面を再読み込みします。復元前のデータは端末内に退避しています。");
         try { location.reload(); }
         catch { setGitHubSyncStatus("復元データを保存しました。アプリを再読み込みしてください。復元前のデータは端末内に退避しています。"); }
@@ -6281,6 +6353,376 @@
           exportedAt: new Date().toISOString(), state: exported }, null, 2), "todoboard-before-github-restore.json");
         setGitHubSyncStatus("GitHubから復元する前のデータを書き出しました。");
       } catch { setGitHubSyncStatus("復元前のデータを書き出せませんでした。端末内の退避一覧も確認してください。", true); }
+    }
+
+    // ---- 自動同期。基準SHAは取得だけでは更新せず、同一内容の照合／保存／復元で確立する。
+    function githubAutoStable(value) {
+      if (Array.isArray(value)) return value.map(githubAutoStable);
+      if (value && typeof value === "object") return Object.fromEntries(Object.keys(value).sort().map(key => [key, githubAutoStable(value[key])]));
+      return value;
+    }
+
+    function githubAutoComparable(source) {
+      const { loaded, dropped } = normalizeParsedState(source);
+      if (dropped) throw githubSyncError("読み込めないデータがあるため自動同期を停止しました。");
+      const shared = {};
+      for (const key of ["parents", "timetables", "classColorPresets", "dayTimetableOverrides", "weekSortMode", "weekOrderChildIds", "weekOrderParentIds", "categoryColors", "importanceColors", "certaintyOptions", "certaintyColors", "showClassesInTimeline", "timelineSettings"]) shared[key] = loaded[key];
+      shared.todos = loaded.todos.map(({ imageId, ...todo }) => {
+        // IndexedDBへの移行・復元で変わる端末内IDは、画像本体があれば比較しない。
+        if (imageId && !safeImageSrc(todo.imageData)) todo.unavailableImageReference = imageId;
+        return todo;
+      });
+      return JSON.stringify(githubAutoStable(shared));
+    }
+
+    function githubAutoLocalCanonical(omissions = githubAuto.omissions || []) {
+      const exported = exportableState();
+      return githubAutoComparable({ ...exported, todos: exported.todos.map(todo => {
+        if (todo.imageId && !safeImageSrc(todo.imageData) && omissions.some(item => item.todoId === todo.id && item.imageId === todo.imageId)) {
+          const { imageId, ...copy } = todo;
+          return { ...copy, imageData: "" };
+        }
+        return todo;
+      }) });
+    }
+
+    async function githubAutoHash(text) {
+      if (!globalThis.crypto?.subtle) throw githubSyncError("このブラウザーでは同期内容を安全に照合できません。最新版のブラウザーを使用してください。");
+      const digest = await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+      return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, "0")).join("");
+    }
+
+    function githubAutoAssertCurrent() {
+      if (githubAutoExternal || localStorage.getItem(GITHUB_AUTO_KEY) !== githubAutoRaw) {
+        githubAutoExternal = true;
+        clearTimeout(githubAutoTimer); githubAutoTimer = null;
+        throw githubSyncError("別のタブでデータまたは同期設定が変わりました。未保存の入力があれば控えてから、この画面を再読み込みしてください。");
+      }
+      if (githubAutoReady && localStorage.getItem(STORAGE_KEY) !== githubAutoLocalRaw) {
+        githubAutoExternal = true;
+        throw githubSyncError("別のタブでデータが変わったため、この画面からの保存を停止しました。再読み込みしてください。");
+      }
+    }
+
+    function githubAutoWrite(next) {
+      githubAutoAssertCurrent();
+      const raw = JSON.stringify({ ...next, schema: 1 });
+      try {
+        localStorage.setItem(GITHUB_AUTO_KEY, raw);
+        if (localStorage.getItem(GITHUB_AUTO_KEY) !== raw) throw new Error();
+      } catch { throw githubSyncError("同期状態を端末内に保存できません。容量を確認してください。自動送信は停止しています。"); }
+      githubAutoRaw = raw;
+      githubAuto = JSON.parse(raw);
+    }
+
+    function githubAutoRollback(raw) {
+      try {
+        if (localStorage.getItem(GITHUB_AUTO_KEY) !== githubAutoRaw) { githubAutoExternal = true; return; }
+        if (raw === null) localStorage.removeItem(GITHUB_AUTO_KEY); else localStorage.setItem(GITHUB_AUTO_KEY, raw);
+        githubAutoRaw = raw;
+        githubAuto = JSON.parse(raw || "{}");
+      } catch { githubAutoExternal = true; }
+    }
+
+    function githubAutoCanSaveLocal() {
+      if (!githubAuto.enabled && !githubAutoExternal) return true;
+      try { githubAutoAssertCurrent(); return true; }
+      catch (error) { githubAutoNotice = error.message; renderGitHubAutoStatus(); return false; }
+    }
+
+    function renderGitHubAutoStatus() {
+      const enabled = githubAuto.enabled === true;
+      $("#githubAutoEnabled").checked = enabled;
+      const problem = githubAutoExternal || Boolean(githubAuto.paused);
+      let short = "自動同期オフ";
+      let message = "自動同期はオフです。有効にすると、まずGitHubの内容を照合します。";
+      if (enabled) {
+        short = githubAuto.pending || githubAuto.inFlight ? "GitHubに未送信" : "同期済み";
+        message = githubAuto.pending || githubAuto.inFlight ? "端末に保存済み。GitHubに未送信の変更があります。" : "この端末の内容はGitHubと同期済みです。";
+        if (navigator.onLine === false) { short = "オフライン"; message = "オフラインです。次回接続時にGitHubを確認してから送信します。"; }
+        if (githubSyncBusy) short = "同期を確認中";
+      }
+      if (problem) { short = githubAutoExternal ? "別タブの更新あり" : "同期を停止中"; message = githubAuto.pauseMessage || "自動同期は停止しています。内容を確認してください。"; }
+      if (githubAutoNotice) message = githubAutoNotice;
+      if (githubAuto.lastSyncedAt) message += "\n最終同期：" + githubSyncDateLabel(githubAuto.lastSyncedAt);
+      if ((githubAuto.omissions || []).length) message += "\n確認済みの読み込めない画像は、参照が同じ間だけ送信に含めません。";
+      $("#githubAutoStatus").textContent = message;
+      $("#githubAutoRetry").hidden = !enabled || githubAutoExternal || ["conflict", "remote", "setup"].includes(githubAuto.paused) || !githubAuto.paused;
+      $("#githubAutoRestore").hidden = !["conflict", "remote", "setup"].includes(githubAuto.paused) || githubAutoExternal;
+      const indicator = $("#githubAutoIndicator");
+      indicator.hidden = !enabled && !problem;
+      indicator.textContent = short;
+      indicator.setAttribute("data-warning", String(problem || Boolean(githubAuto.pending) || Boolean(githubAuto.inFlight)));
+      indicator.setAttribute("title", message);
+    }
+
+    function githubAutoPause(reason, message) {
+      clearTimeout(githubAutoTimer); githubAutoTimer = null;
+      githubAutoNotice = message;
+      try { githubAutoWrite({ ...githubAuto, paused: reason, pauseMessage: message }); }
+      catch (error) { githubAuto.paused = "storage"; githubAutoNotice = error.message; }
+      setGitHubSyncStatus(githubAutoNotice, true);
+      renderGitHubAutoStatus();
+    }
+
+    function githubAutoSchedule(delay = 3000) {
+      clearTimeout(githubAutoTimer); githubAutoTimer = null;
+      if (!githubAutoReady || !githubAuto.enabled || githubAuto.paused || githubAutoExternal || navigator.onLine === false) return;
+      // 連続操作は最後から3秒、操作が続いても最長60秒で一度送信を試す。
+      if (delay === 3000 && githubAutoFirstChange) delay = Math.min(delay, Math.max(0, githubAutoFirstChange + 60000 - Date.now()));
+      githubAutoTimer = setTimeout(() => {
+        githubAutoTimer = null;
+        return githubAutoRun().catch(error => githubAutoHandleError(error));
+      }, delay);
+    }
+
+    function githubAutoOnLocalSave() {
+      if (!githubAutoReady || githubAutoQuiet) return;
+      try {
+        const current = githubAutoLocalCanonical();
+        if (current === githubAutoSeen) return;
+        githubAutoSeen = current;
+        if (!githubAuto.enabled) return;
+        githubAutoWrite({ ...githubAuto, pending: true });
+        if (!githubAutoFirstChange) githubAutoFirstChange = Date.now();
+        if (!githubAuto.paused) githubAutoNotice = "端末に保存済み。最後の変更から3秒後にGitHubへ送信します。";
+        githubAutoSchedule();
+        renderGitHubAutoStatus();
+      } catch (error) { githubAutoPause("storage", error.message); }
+    }
+
+    function githubAutoRemote(file) {
+      const text = githubSyncDecodeFile(file);
+      try {
+        const payload = JSON.parse(text);
+        const version = /^Todo Calendar Board v(\d+)$/.exec(payload.app || "");
+        if (!version || Number(version[1]) > Number(APP_VERSION.slice(1))) throw new Error();
+        if (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/i.test(file.sha || "")) throw new Error();
+        githubAutoComparable(payload.state);
+        return { payload, text, sha: file.sha };
+      } catch { throw githubSyncError("GitHubのデータ形式を確認できません。新しい版のアプリが必要な場合もあります。自動同期は停止しています。"); }
+    }
+
+    async function githubAutoAccept(repo, repository, sha, payload, omissions = []) {
+      const baseHash = await githubAutoHash(githubAutoComparable(payload.state));
+      const pending = githubAutoLocalCanonical(omissions) !== githubAutoComparable(payload.state);
+      try {
+        githubAutoWrite({ ...githubAuto, repository, branch: repo.default_branch, baseSha: sha, baseHash,
+          omissions, pending, inFlight: null, paused: "", lastSyncedAt: new Date().toISOString(), lastCheckedAt: new Date().toISOString() });
+      } catch {
+        githubAuto.paused = "storage";
+        throw githubSyncError("GitHubへの保存は完了しましたが、端末内に同期状態を記録できませんでした。自動同期を停止しました。最新状態を確認してください。");
+      }
+      githubAutoRetryCount = 0;
+      githubAutoFirstChange = pending ? Date.now() : 0;
+      githubAutoSeen = githubAutoLocalCanonical();
+      githubAutoNotice = pending ? "送信中に追加の変更がありました。端末に保存済みで、次に送信します。" : "GitHubへの保存が完了しました。";
+      renderGitHubAutoStatus();
+    }
+
+    function githubAutoHandleError(error) {
+      if (githubAutoExternal) { githubAutoNotice = error.message; renderGitHubAutoStatus(); return; }
+      const rateLimited = error.rateLimited;
+      const transient = error.transient || error.status >= 500 || rateLimited;
+      if (transient && githubAuto.enabled && ++githubAutoRetryCount <= 5) {
+        githubAutoNotice = "通信を完了できません。未送信の変更は残っています。接続後に再確認します。";
+        const delay = Math.min(300000, 5000 * 2 ** (githubAutoRetryCount - 1));
+        githubAutoSchedule(rateLimited ? Math.max(delay, error.retryMs || 60000) : delay);
+        renderGitHubAutoStatus();
+      } else {
+        githubAutoPause(error.status === 409 ? "conflict" : error.status === 401 || error.status === 403 ? "auth" : "attention", error?.message || "同期を完了できませんでした。未送信の変更は残っています。");
+      }
+    }
+
+    async function githubAutoRun() {
+      if (!githubAutoReady || !githubAuto.enabled || githubAuto.paused || githubAutoExternal || githubSyncBusy) return false;
+      if (navigator.onLine === false) { renderGitHubAutoStatus(); return false; }
+      return runGitHubSync("自動同期", async credentials => {
+        if (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/i.test(githubAuto.baseSha || "") || !/^[a-f0-9]{64}$/.test(githubAuto.baseHash || "")) {
+          githubAutoPause("setup", "この端末の同期をまだ確立できていません。GitHubから読み込むか、内容を確認して手動保存してください。"); return false;
+        }
+        const repo = await githubSyncRepository(credentials, true);
+        if (credentials.repository !== githubAuto.repository || repo.default_branch !== githubAuto.branch) {
+          githubAutoPause("setup", "保存先または標準ブランチが変わりました。自動同期を設定し直してください。"); return false;
+        }
+        const remote = githubAutoRemote(await githubSyncRequest(credentials, githubSyncFilePath(repo)));
+        githubAutoAssertCurrent();
+        if (githubAuto.inFlight) {
+          const sent = githubAuto.inFlight;
+          if (remote.text === sent.text) {
+            await githubAutoAccept(repo, credentials.repository, remote.sha, remote.payload, sent.omissions || []);
+          } else if (remote.sha !== sent.baseSha) {
+            githubAutoPause("conflict", "送信結果の確認中に別の更新が見つかりました。自動上書きはしていません。この端末の変更を保管してからGitHubの内容を確認してください。"); return false;
+          } else {
+            githubAutoWrite({ ...githubAuto, inFlight: null });
+          }
+        }
+        if (remote.sha !== githubAuto.baseSha) {
+          githubAutoPause(githubAuto.pending ? "conflict" : "remote", `別の端末で更新されています。自動上書きを停止しました。\nGitHubの保存日時：${githubSyncDateLabel(remote.payload.exportedAt)}\nこの端末の変更は残っています。「データを書き出す」で保管してから「GitHubから読み込む」を使用できます。`); return false;
+        }
+        let prepared;
+        githubAutoQuiet = true;
+        try { prepared = await githubSyncPayload({ automatic: true }); }
+        finally { githubAutoQuiet = false; }
+        const { payload, omissions } = prepared;
+        const comparable = githubAutoComparable(payload.state);
+        const hash = await githubAutoHash(comparable);
+        githubAutoAssertCurrent();
+        if (hash === githubAuto.baseHash) {
+          const pending = githubAutoLocalCanonical() !== comparable;
+          githubAutoWrite({ ...githubAuto, pending, lastCheckedAt: new Date().toISOString() });
+          githubAutoFirstChange = pending ? Date.now() : 0;
+          githubAutoNotice = pending ? "追加の変更を次に送信します。" : "GitHubの内容を確認しました。未送信の変更はありません。";
+          setGitHubSyncStatus(githubAutoNotice);
+          return true;
+        }
+        const text = JSON.stringify(payload, null, 2);
+        const content = githubSyncEncode(text);
+        // 応答が失われても、次回起動で同じ送信内容を照合できる。トークンは含めない。
+        githubAutoWrite({ ...githubAuto, pending: true, inFlight: { text, hash, baseSha: remote.sha, omissions } });
+        githubSyncCheckLocal();
+        githubAutoAssertCurrent();
+        if (!githubAuto.enabled || githubAuto.paused) return false;
+        const result = await githubSyncRequest(credentials, "/contents/data.json", { method: "PUT", body: {
+          message: "TodoBoard data sync", content, branch: githubAuto.branch, sha: remote.sha
+        } });
+        if (!result.content?.sha) { const failure = githubSyncError("保存結果を確認できません。次回接続時に照合します。"); failure.transient = true; throw failure; }
+        await githubAutoAccept(repo, credentials.repository, result.content.sha, payload, omissions);
+        setGitHubSyncStatus("GitHubに自動保存しました。\n保存日時：" + githubSyncDateLabel(payload.exportedAt));
+        return true;
+      }, { automatic: true });
+    }
+
+    function inspectGitHubAutoRemote() {
+      return runGitHubSync("GitHubの確認", async credentials => {
+        const repo = await githubSyncRepository(credentials);
+        const remote = githubAutoRemote(await githubSyncRequest(credentials, githubSyncFilePath(repo)));
+        githubAutoNotice = `GitHubの現在の保存日時：${githubSyncDateLabel(remote.payload.exportedAt)}\n自動同期は停止したままです。この端末の変更を保管してから、GitHubの内容を読み込んで確認できます。`;
+        setGitHubSyncStatus(githubAutoNotice);
+        return true;
+      }, { automatic: true });
+    }
+
+    async function enableGitHubAutoSync({ enable = true } = {}) {
+      return runGitHubSync("自動同期の設定", async credentials => {
+        const repo = await githubSyncRepository(credentials);
+        const file = await githubSyncRequest(credentials, githubSyncFilePath(repo), { allowMissing: true });
+        if (!file) {
+          githubAutoNotice = "GitHubにdata.jsonがありません。最初の1回は「GitHubに保存」で内容を確認して保存し、その後に自動同期を有効にしてください。";
+          githubAutoWrite({ ...githubAuto, enabled: false, paused: "first-save", pauseMessage: githubAutoNotice });
+          return false;
+        }
+        const remote = githubAutoRemote(file);
+        await loadImageCache();
+        const local = githubAutoLocalCanonical();
+        const remoteComparable = githubAutoComparable(remote.payload.state);
+        if (local !== remoteComparable) {
+          githubAutoNotice = `GitHubとこの端末の内容が異なります。自動送信は開始していません。\nGitHubの保存日時：${githubSyncDateLabel(remote.payload.exportedAt)}\n新しい端末では「GitHubから読み込む」を押してください。この端末の内容を残す場合は、先に「データを書き出す」で保管できます。`;
+          githubAutoWrite({ ...githubAuto, enabled: false, paused: "setup", pauseMessage: githubAutoNotice });
+          setGitHubSyncStatus(githubAutoNotice);
+          return false;
+        }
+        if (!navigator.locks?.request) throw githubSyncError("このブラウザーは安全な自動同期に対応していません。手動保存を使用してください。");
+        const baseHash = await githubAutoHash(local);
+        githubAutoWrite({ ...githubAuto, enabled: enable, repository: credentials.repository, branch: repo.default_branch,
+          baseSha: remote.sha, baseHash, pending: githubAutoLocalCanonical() !== local, paused: "", inFlight: null,
+          lastSyncedAt: new Date().toISOString(), lastCheckedAt: new Date().toISOString() });
+        githubAutoSeen = githubAutoLocalCanonical();
+        githubAutoNotice = enable ? "自動同期を有効にしました。最後の変更から3秒後に送信します。" : "GitHubと内容が一致しています。自動同期はオフのままです。";
+        setGitHubSyncStatus(githubAutoNotice);
+        return true;
+      }, { automatic: true });
+    }
+
+    function initGitHubAutoSync() {
+      try {
+        githubAutoRaw = localStorage.getItem(GITHUB_AUTO_KEY);
+        const saved = JSON.parse(githubAutoRaw || "{}");
+        if (!isPlainObject(saved) || (githubAutoRaw && saved.schema !== 1)) throw new Error();
+        githubAuto = saved;
+        githubAutoLocalRaw = localStorage.getItem(STORAGE_KEY);
+        if (githubAuto.enabled && (!githubAutoLocalRaw || loadIssue)) {
+          githubAutoNotice = "この端末の保存データを確認できないため、自動同期を無効にしました。まずGitHubから読み込んでください。見本や空のデータは自動送信しません。";
+          githubAutoWrite({ ...githubAuto, enabled: false, paused: "setup", pauseMessage: githubAutoNotice });
+        }
+      } catch {
+        if (githubAuto.enabled) githubAutoExternal = true;
+        githubAuto = { paused: "setup" };
+        githubAutoNotice = "自動同期の設定を読み込めませんでした。内容を確認して設定し直してください。";
+      }
+      $("#githubAutoEnabled").addEventListener("change", () => {
+        if ($("#githubAutoEnabled").checked) enableGitHubAutoSync();
+        else {
+          clearTimeout(githubAutoTimer); githubAutoTimer = null;
+          try { githubAutoWrite({ ...githubAuto, enabled: false }); githubAutoNotice = "自動同期をオフにしました。未送信の変更は端末内に残っています。"; }
+          catch (error) { githubAutoNotice = error.message; }
+          renderGitHubAutoStatus();
+        }
+      });
+      $("#githubAutoCheck").addEventListener("click", () => {
+        if (githubAuto.enabled) {
+          if (!["conflict", "remote", "setup"].includes(githubAuto.paused)) githubAutoRetry();
+          else inspectGitHubAutoRemote();
+        } else enableGitHubAutoSync({ enable: false });
+      });
+      $("#githubAutoRetry").addEventListener("click", githubAutoRetry);
+      $("#githubAutoRestore").addEventListener("click", restoreFromGitHub);
+      $("#githubAutoIndicator").addEventListener("click", () => { navigateFast("data"); $("#githubSyncCard").scrollIntoView({ block: "start", behavior: "smooth" }); });
+      $("#githubSyncRepo").addEventListener("change", () => {
+        clearTimeout(githubAutoTimer); githubAutoTimer = null;
+        try { githubAutoWrite({ enabled: false, paused: "setup" }); githubAutoNotice = "保存先を変更しました。自動同期を有効にして内容を照合してください。"; }
+        catch (error) { githubAutoNotice = error.message; }
+        renderGitHubAutoStatus();
+      });
+      $("#githubSyncForget").addEventListener("click", () => {
+        if (githubAuto.enabled) githubAutoPause("auth", "トークンを消去したため、自動同期を停止しています。未送信の変更は残っています。");
+      });
+      window.addEventListener?.("storage", event => {
+        if ((event.key === null || [STORAGE_KEY, GITHUB_AUTO_KEY, GITHUB_SYNC_KEY].includes(event.key)) && (githubAuto.enabled || githubAutoReady)) {
+          githubAutoExternal = true;
+          clearTimeout(githubAutoTimer); githubAutoTimer = null;
+          githubAutoNotice = "別のタブでデータまたは同期設定が変わりました。この画面からの保存を停止しています。未保存の入力があれば控えてから再読み込みしてください。";
+          renderGitHubAutoStatus();
+        }
+      });
+      window.addEventListener?.("online", () => { if (githubAuto.enabled && !githubAuto.paused) githubAutoSchedule(0); });
+      window.addEventListener?.("offline", renderGitHubAutoStatus);
+      document.addEventListener?.("visibilitychange", () => {
+        if (document.visibilityState === "hidden") githubAutoFlush();
+        else if (githubAuto.enabled && !githubAuto.paused) githubAutoSchedule(0);
+      });
+      window.addEventListener?.("pagehide", githubAutoFlush);
+      if (!githubSyncSettings.lastAction && githubAuto.lastSyncedAt) {
+        setGitHubSyncStatus("最後に同期・照合を完了した日時：" + githubSyncDateLabel(githubAuto.lastSyncedAt));
+      }
+      renderGitHubAutoStatus();
+    }
+
+    async function startGitHubAutoSync() {
+      try {
+        if (githubAuto.enabled && localStorage.getItem(STORAGE_KEY) !== githubAutoLocalRaw) githubAutoExternal = true;
+        githubAutoSeen = githubAutoLocalCanonical();
+        githubAutoReady = true;
+        if (githubAuto.enabled && !githubAuto.paused) githubAutoSchedule(0);
+        renderGitHubAutoStatus();
+      } catch (error) { githubAutoPause("attention", error.message); }
+    }
+
+    function githubAutoFlush() {
+      flushSave();
+      if (!githubAuto.enabled || (!githubAuto.pending && !githubAuto.inFlight) || githubAuto.paused) return;
+      clearTimeout(githubAutoTimer); githubAutoTimer = null;
+      return githubAutoRun().catch(error => githubAutoHandleError(error));
+    }
+
+    function githubAutoRetry() {
+      if (githubAutoExternal || ["conflict", "remote", "setup"].includes(githubAuto.paused)) return;
+      try {
+        githubAutoWrite({ ...githubAuto, paused: "" });
+        githubAutoRetryCount = 0;
+        githubAutoNotice = "GitHubの内容を再確認します。";
+        githubAutoSchedule(0);
+      } catch (error) { githubAutoNotice = error.message; renderGitHubAutoStatus(); }
     }
 
     // ---- 毎日の自動バックアップ（端末内） -----------------------------------
@@ -6385,6 +6827,7 @@
       await runDailyBackup();
       collectUnusedImages().catch(() => {});
       if (state.view === "data") renderStorageDetails();
+      await startGitHubAutoSync();
     }
 
 
