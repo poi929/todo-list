@@ -1521,7 +1521,7 @@
   </div>
 
   <script>
-    const APP_VERSION = "v123";
+    const APP_VERSION = "v124";
     // 保存キーは変更しない。旧版の removeOldStorageKeys() は「todo-calendar-board-v数字」の
     // 自分以外のキーを削除するため、キー名を変えると旧版へ戻した時に新データが消える。
     const STORAGE_KEY = "todo-calendar-board-v96";
@@ -6121,10 +6121,19 @@
       await loadImageCache();
       if (imageMigrationRunning) throw githubSyncError("画像を準備中です。少し待ってから保存してください。");
       if (!saveState({ silent: true })) throw githubSyncError("現在のデータを端末に保存できなかったため、GitHubへの保存を中止しました。");
-      const missing = state.todos.some(todo => todo.imageId && !imageCache.has(todo.imageId) && !safeImageSrc(todo.imageData));
-      if (missing) throw githubSyncError("読み込めない参考画像があるため、GitHubへの保存を中止しました。画像の表示を確認してください。");
-      return { app: "Todo Calendar Board " + APP_VERSION, storageKey: STORAGE_KEY,
-        exportedAt: new Date().toISOString(), state: exportableState() };
+      // 確認中に元のstateが変わっても、確認した書き出し内容だけを保存する。
+      const exported = JSON.parse(JSON.stringify(exportableState()));
+      const missing = exported.todos.filter(todo => todo.imageId && !safeImageSrc(todo.imageData));
+      if (missing.length) {
+        const titles = missing.slice(0, 5).map(todo => "・" + String(todo.title || "（題名なし）").slice(0, 80)).join("\n");
+        const answer = await confirmDialog({ title: "読み込めない画像を含めずに保存しますか？",
+          message: `参考画像を読み込めない項目が${missing.length}件あります。\n${titles}${missing.length > 5 ? "\nほか" + (missing.length - 5) + "件" : ""}\n\n予定・Todoの内容と、読み込める画像は保存できます。読み込めない画像は今回のGitHub保存に含まれず、そのデータを別端末で復元しても表示できません。\n\nこの端末のデータや画像の参照は削除しません。`,
+          buttons: [{ label: "キャンセル", value: null }, { label: "画像なしで保存", value: true, style: "primary" }] });
+        if (answer !== true) { setGitHubSyncStatus("GitHubへの保存を取り消しました。現在のデータは変更していません。"); return null; }
+        missing.forEach(todo => { delete todo.imageId; todo.imageData = ""; });
+      }
+      return { payload: { app: "Todo Calendar Board " + APP_VERSION, storageKey: STORAGE_KEY,
+        exportedAt: new Date().toISOString(), state: exported }, omittedImages: missing.length };
     }
 
     async function runGitHubSync(operation, action) {
@@ -6163,7 +6172,11 @@
             if (answer !== true) { setGitHubSyncStatus("GitHubへの保存を取り消しました。"); return false; }
           }
         }
-        const payload = await githubSyncPayload();
+        const prepared = await githubSyncPayload();
+        if (!prepared) return false;
+        githubSyncCheckLocal();
+        const { payload, omittedImages } = prepared;
+        const imageNotice = omittedImages ? `\n読み込めない参考画像${omittedImages}件は含めずに保存しました。この端末のデータは変更していません。` : "";
         const content = githubSyncEncode(JSON.stringify(payload, null, 2));
         const result = await githubSyncRequest(credentials, "/contents/data.json", { method: "PUT", body: {
           message: "TodoBoard data sync", content, branch: repo.default_branch, ...(existing ? { sha: existing.sha } : {})
@@ -6173,10 +6186,10 @@
           persistGitHubSyncSettings({ remoteRepo: credentials.repository, remoteBranch: repo.default_branch, remoteSha: result.content.sha,
             lastAction: "save", lastActionAt: payload.exportedAt, sourceExportedAt: payload.exportedAt });
         } catch {
-          setGitHubSyncStatus(`GitHubの ${credentials.repository}/data.json に保存しました。ただし、この端末に保存履歴を記録できませんでした。`, true);
+          setGitHubSyncStatus(`GitHubの ${credentials.repository}/data.json に保存しました。ただし、この端末に保存履歴を記録できませんでした。${imageNotice}`, true);
           return true;
         }
-        setGitHubSyncStatus(`${credentials.repository}/data.json に保存しました。\n保存日時：${githubSyncDateLabel(payload.exportedAt)}`);
+        setGitHubSyncStatus(`${credentials.repository}/data.json に保存しました。\n保存日時：${githubSyncDateLabel(payload.exportedAt)}${imageNotice}`);
         return true;
       });
     }

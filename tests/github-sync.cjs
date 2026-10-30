@@ -58,7 +58,7 @@ function harness(options={}) {
   context.renderSystemBanner=()=>{};
   context.loadImageCache=async()=>{};
   context.backupRawToIdb=async(raw,reason)=>{backups.push({raw,reason});if(options.noIdb)throw new Error('unavailable');};
-  context.confirmDialog=async config=>{confirmations.push(config);return options.confirm===undefined?true:options.confirm;};
+  context.confirmDialog=async config=>{confirmations.push(config);return typeof options.confirm==='function' ? options.confirm(config,context) : options.confirm===undefined?true:options.confirm;};
   context.downloadText=(text,name)=>downloads.push({text,name});
   const api=context.api;
   if(!values.has(MAIN))assert.equal(api.saveState({silent:true}),true);
@@ -154,10 +154,64 @@ test('950KB limit measures UTF-8 bytes and blocks a large upload',async()=>{
   assert.equal(h.requests.some(r=>r.init.method==='PUT'),false);
 });
 
-test('image references that cannot be exported stop the upload',async()=>{
-  const h=harness();h.api.setTodos([{id:'missing',kind:'todo',title:'task',date:'2026-10-30',imageId:'missing'}]);
-  assert.equal(await h.api.saveToGitHub(),false);assert.match(h.status(),/参考画像/);
+test('cancelling the missing-image warning stops the upload and preserves local references',async()=>{
+  const h=harness({confirm:null});h.api.setTodos([{id:'missing',kind:'todo',title:'task',date:'2026-10-30',imageId:'missing'}]);
+  assert.equal(await h.api.saveToGitHub(),false);assert.match(h.status(),/取り消しました/);
   assert.equal(h.requests.some(r=>r.init.method==='PUT'),false);
+  assert.equal(h.confirmations.length,1);assert.match(h.confirmations[0].message,/task/);
+  assert.match(h.confirmations[0].message,/復元しても表示できません/);
+  assert.equal(h.api.getState().todos[0].imageId,'missing');
+  assert.equal(JSON.parse(h.values.get(MAIN)).todos[0].imageId,'missing');
+});
+
+test('confirmed save omits only unreadable images, preserving all items and readable images locally and remotely',async()=>{
+  const h=harness();h.api.setTodos([
+    {id:'missing',kind:'todo',title:'課題',date:'2026-10-30',done:true,failed:true,imageId:'missing'},
+    {id:'cached',kind:'event',title:'予定',date:'2026-10-30',imageId:'available'},
+    {id:'inline',kind:'todo',title:'別の課題',date:'2026-10-30',imageId:'old-id',imageData:'data:image/png;base64,YWJj'}
+  ]);
+  h.api.setImage('available','data:image/png;base64,ZGVm');
+  const before=JSON.stringify(h.api.getState().todos);
+  assert.equal(await h.api.saveToGitHub(),true);
+  const payload=JSON.parse(Buffer.from(h.server.file.content,'base64').toString('utf8'));
+  assert.deepEqual(Object.keys(payload),['app','storageKey','exportedAt','state']);
+  assert.equal(payload.state.todos.length,3);assert.equal(payload.state.todos[0].title,'課題');
+  assert.equal(payload.state.todos[0].done,true);assert.equal(payload.state.todos[0].failed,true);
+  assert.equal('imageId' in payload.state.todos[0],false);assert.equal(payload.state.todos[0].imageData,'');
+  assert.equal(payload.state.todos[1].imageData,'data:image/png;base64,ZGVm');
+  assert.equal(payload.state.todos[2].imageData,'data:image/png;base64,YWJj');
+  assert.equal(JSON.stringify(h.api.getState().todos),before);
+  assert.equal(JSON.stringify(JSON.parse(h.values.get(MAIN)).todos),before);
+  assert.equal(h.confirmations.length,1);assert.match(h.status(),/参考画像1件は含めず/);
+});
+
+test('the missing-image warning bounds the displayed list and states the full count',async()=>{
+  const h=harness({confirm:null});h.api.setTodos(Array.from({length:8},(_,i)=>({id:String(i),title:'task-'+i+'x'.repeat(100),imageId:'missing-'+i})));
+  assert.equal(await h.api.saveToGitHub(),false);
+  assert.match(h.confirmations[0].message,/8件/);assert.match(h.confirmations[0].message,/ほか3件/);
+  assert.equal(h.confirmations[0].message.includes('task-5'),false);
+});
+
+test('an edit during the image confirmation does not change the snapshot that was reviewed',async()=>{
+  const h=harness({confirm:async(config,context)=>{context.api.getState().todos[0].title='edited later';return true;}});
+  h.api.setTodos([{id:'missing',kind:'todo',title:'reviewed title',date:'2026-10-30',imageId:'missing'}]);
+  assert.equal(await h.api.saveToGitHub(),true);
+  const payload=JSON.parse(Buffer.from(h.server.file.content,'base64').toString('utf8'));
+  assert.equal(payload.state.todos[0].title,'reviewed title');assert.equal(h.api.getState().todos[0].title,'edited later');
+});
+
+test('local storage becoming blocked during confirmation prevents a PUT',async()=>{
+  const h=harness({confirm:async(config,context)=>{context.api.setBlocked(true);return true;}});
+  h.api.setTodos([{id:'missing',kind:'todo',title:'task',date:'2026-10-30',imageId:'missing'}]);
+  assert.equal(await h.api.saveToGitHub(),false);assert.match(h.status(),/端末内の保存/);
+  assert.equal(h.requests.some(r=>r.init.method==='PUT'),false);
+});
+
+test('a local history failure still reports that unreadable images were omitted from the saved file',async()=>{
+  let h;h=harness({failWrite:key=>key===SETTINGS&&Boolean(h?.server.file)});
+  h.api.setTodos([{id:'missing',kind:'todo',title:'task',date:'2026-10-30',imageId:'missing'}]);
+  assert.equal(await h.api.saveToGitHub(),true);
+  assert.match(h.status(),/履歴を記録できません/);assert.match(h.status(),/参考画像1件は含めず/);
 });
 
 test('the remember option and forget action change only dedicated settings',()=>{
