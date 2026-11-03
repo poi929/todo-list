@@ -1544,7 +1544,7 @@
   </div>
 
   <script>
-    const APP_VERSION = "v126";
+    const APP_VERSION = "v127";
     // 保存キーは変更しない。旧版の removeOldStorageKeys() は「todo-calendar-board-v数字」の
     // 自分以外のキーを削除するため、キー名を変えると旧版へ戻した時に新データが消える。
     const STORAGE_KEY = "todo-calendar-board-v96";
@@ -5442,7 +5442,8 @@
       }
 
       // 選んだ日の一覧は、月カレンダーのマスで隠したTodoも表示する。
-      const agenda = agendaItemsForDate(selected, false);
+      // 授業も他の表示と同じく「授業を表示」の設定に従って含める（通常の授業も出す）。
+      const agenda = agendaItemsForDate(selected);
       const todos = effectiveTodosForDate(selected).filter(entry => entry.todo.kind !== "event")
         .sort(compareMonthTodoEntries);
       const listHtml = agenda.length || todos.length
