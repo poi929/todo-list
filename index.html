@@ -654,6 +654,7 @@
     .toggle-row .info { flex: 1; min-width: 0; }
     .toggle-row .info strong { display: block; font-size: 14px; }
     .toggle-row .info small { color: var(--muted); font-size: 12px; }
+    .override-room-input { margin-top: 6px; width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--text); font-size: 13px; }
     .switch { position: relative; width: 48px; height: 28px; flex: 0 0 auto; }
     .switch input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
     .switch span { position: absolute; inset: 0; border-radius: 999px; background: #d3d7de; transition: background .15s; pointer-events: none; }
@@ -1345,7 +1346,8 @@
           <select id="overrideWeekday"></select>
         </label>
         <div class="field">
-          <span class="field-label">休講にする授業</span>
+          <span class="field-label">休講・場所の変更</span>
+          <p class="hint" style="margin:0 0 6px">場所を書き換えると、その日だけ別の場所（オンデマンドなど）として表示されます。空欄のままなら通常の教室です。</p>
           <div id="overrideClassList" class="toggle-list"></div>
         </div>
         <div class="field">
@@ -1544,7 +1546,7 @@
   </div>
 
   <script>
-    const APP_VERSION = "v127";
+    const APP_VERSION = "v128";
     // 保存キーは変更しない。旧版の removeOldStorageKeys() は「todo-calendar-board-v数字」の
     // 自分以外のキーを削除するため、キー名を変えると旧版へ戻した時に新データが消える。
     const STORAGE_KEY = "todo-calendar-board-v96";
@@ -2384,6 +2386,17 @@
       };
     }
 
+    function normalizeDayOverrideRoomOverrides(raw) {
+      const result = {};
+      if (!raw || typeof raw !== "object" || Array.isArray(raw)) return result;
+      Object.entries(raw).forEach(([id, room]) => {
+        const key = String(id || "");
+        const value = String(room ?? "").trim().slice(0, 80);
+        if (key && value) result[key] = value;
+      });
+      return result;
+    }
+
     function getDayTimetableOverride(dateString) {
       const date = normalizeDateString(dateString);
       const raw = state.dayTimetableOverrides?.[date] || {};
@@ -2392,7 +2405,8 @@
         hiddenClassIds: Array.isArray(raw.hiddenClassIds)
           ? [...new Set(raw.hiddenClassIds.map(id => String(id || "")).filter(Boolean))]
           : [],
-        extraClasses: normalizeDayOverrideExtraClasses(raw.extraClasses)
+        extraClasses: normalizeDayOverrideExtraClasses(raw.extraClasses),
+        roomOverrides: normalizeDayOverrideRoomOverrides(raw.roomOverrides)
       };
     }
 
@@ -2407,13 +2421,14 @@
         ? [...new Set(override.hiddenClassIds.map(id => String(id || "")).filter(Boolean))]
         : [];
       const extraClasses = normalizeDayOverrideExtraClasses(override?.extraClasses);
+      const roomOverrides = normalizeDayOverrideRoomOverrides(override?.roomOverrides);
 
-      if (!weekday && hiddenClassIds.length === 0 && extraClasses.length === 0) {
+      if (!weekday && hiddenClassIds.length === 0 && extraClasses.length === 0 && Object.keys(roomOverrides).length === 0) {
         delete state.dayTimetableOverrides[date];
         return;
       }
 
-      state.dayTimetableOverrides[date] = { weekday, hiddenClassIds, extraClasses };
+      state.dayTimetableOverrides[date] = { weekday, hiddenClassIds, extraClasses, roomOverrides };
     }
 
     function effectiveTimetableDayForDate(dateString, override = getDayTimetableOverride(dateString)) {
@@ -2431,7 +2446,7 @@
 
     function isDayTimetableOverrideActive(dateString) {
       const override = getDayTimetableOverride(dateString);
-      return Boolean(override.weekday || override.hiddenClassIds.length || override.extraClasses.length);
+      return Boolean(override.weekday || override.hiddenClassIds.length || override.extraClasses.length || Object.keys(override.roomOverrides).length);
     }
 
     function dayTimetableOverrideSummary(dateString) {
@@ -2440,6 +2455,8 @@
       if (override.weekday) parts.push(`${weekdayNameFromIndex(Number(override.weekday))}曜時間割`);
       if (override.hiddenClassIds.length) parts.push(`${override.hiddenClassIds.length}件非表示`);
       if (override.extraClasses.length) parts.push(`${override.extraClasses.length}件補講`);
+      const roomCount = Object.keys(override.roomOverrides).length;
+      if (roomCount) parts.push(`${roomCount}件場所変更`);
       return parts.join("・") || "通常どおり";
     }
 
@@ -2456,14 +2473,19 @@
             .filter(item => !Number(item.period) || Number(item.period) <= periodCount)
             .filter(item => classOccursOnDate(item, occurrenceDate))
             .filter(item => includeHidden || !hiddenIds.has(item.id))
-            .map(item => ({
-              ...item,
-              date,
-              occurrenceDate,
-              kind: "class",
-              startTime: item.startTime || defaultPeriodTimes(item.period, classDurationMode(item))[0],
-              endTime: item.endTime || defaultPeriodTimes(item.period, classDurationMode(item))[1]
-            }))
+            .map(item => {
+              const roomOverride = override.roomOverrides?.[item.id];
+              return {
+                ...item,
+                date,
+                occurrenceDate,
+                kind: "class",
+                room: roomOverride !== undefined ? roomOverride : item.room,
+                isRoomChanged: roomOverride !== undefined,
+                startTime: item.startTime || defaultPeriodTimes(item.period, classDurationMode(item))[0],
+                endTime: item.endTime || defaultPeriodTimes(item.period, classDurationMode(item))[1]
+              };
+            })
         : [];
 
       const extraClasses = normalizeDayOverrideExtraClasses(override.extraClasses).map(item => {
@@ -3023,8 +3045,9 @@
           ? [...new Set(value.hiddenClassIds.map(id => String(id || "")).filter(Boolean))]
           : [];
         const extraClasses = normalizeDayOverrideExtraClasses(value.extraClasses);
-        if (weekday || hiddenClassIds.length || extraClasses.length) {
-          normalized[dateKey] = { weekday, hiddenClassIds, extraClasses };
+        const roomOverrides = normalizeDayOverrideRoomOverrides(value.roomOverrides);
+        if (weekday || hiddenClassIds.length || extraClasses.length || Object.keys(roomOverrides).length) {
+          normalized[dateKey] = { weekday, hiddenClassIds, extraClasses, roomOverrides };
         }
       });
 
@@ -7859,26 +7882,41 @@
       $("#overrideWeekday").value = current.weekday || "";
       overrideDraftExtras = clone(current.extraClasses || []);
       overridePickId = "";
-      renderOverrideClassList(current.hiddenClassIds);
+      renderOverrideClassList(current.hiddenClassIds, current.roomOverrides);
       renderOverrideMakeups();
       $("#overrideMakeupPicker").hidden = true;
       openSheet("overrideSheet");
     }
 
-    function renderOverrideClassList(hiddenIds) {
+    function renderOverrideClassList(hiddenIds, roomOverrides = {}) {
       const hidden = new Set(hiddenIds);
+      const rooms = roomOverrides || {};
       const draft = { weekday: $("#overrideWeekday").value || "", hiddenClassIds: [] };
       const list = classesForDateWithOverride(overrideDate, draft, true).filter(item => !item.isMakeupClass);
       $("#overrideClassList").innerHTML = list.length ? list.map(item => `
-        <label class="toggle-row">
-          <span class="info"><strong>${escapeHtml(item.title || "授業")}</strong><small>${weekdayNameFromIndex(Number(item.day))}曜${item.period}限・${escapeHtml(item.startTime || "")}〜${escapeHtml(item.endTime || "")}${item.room ? "・" + escapeHtml(item.room) : ""}</small></span>
+        <div class="toggle-row">
+          <span class="info"><strong>${escapeHtml(item.title || "授業")}</strong><small>${weekdayNameFromIndex(Number(item.day))}曜${item.period}限・${escapeHtml(item.startTime || "")}〜${escapeHtml(item.endTime || "")}${item.room ? "・" + escapeHtml(item.room) : ""}</small>
+          <input type="text" class="override-room-input" data-override-room-id="${escapeHtml(item.id)}" value="${escapeHtml(rooms[item.id] || "")}" placeholder="この日の場所（通常：${escapeHtml(item.room || "未設定")}）" aria-label="${escapeHtml(item.title)}のこの日の場所" /></span>
           <span class="muted small">休講</span>
           <span class="switch"><input type="checkbox" data-override-class-id="${escapeHtml(item.id)}" ${hidden.has(item.id) ? "checked" : ""} aria-label="${escapeHtml(item.title)}を休講にする" /><span></span></span>
-        </label>`).join("") : `<p class="muted small">この日に表示される授業はありません。</p>`;
+        </div>`).join("") : `<p class="muted small">この日に表示される授業はありません。</p>`;
     }
 
     function currentOverrideHiddenIds() {
       return $$("#overrideClassList [data-override-class-id]:checked").map(input => input.dataset.overrideClassId);
+    }
+
+    function currentOverrideRoomOverrides() {
+      const result = {};
+      $$("#overrideClassList [data-override-room-id]").forEach(input => {
+        const id = input.dataset.overrideRoomId;
+        const value = input.value.trim();
+        if (!id || !value) return;
+        const source = state.classes.find(item => item.id === id);
+        if (source && (source.room || "") === value) return;
+        result[id] = value;
+      });
+      return result;
     }
 
     function renderOverrideMakeups() {
@@ -7939,7 +7977,7 @@
     function saveOverrideSheet() {
       const previous = clone(state.dayTimetableOverrides?.[overrideDate] || null);
       const date = overrideDate;
-      saveDayTimetableOverride(date, { weekday: $("#overrideWeekday").value || "", hiddenClassIds: currentOverrideHiddenIds(), extraClasses: overrideDraftExtras });
+      saveDayTimetableOverride(date, { weekday: $("#overrideWeekday").value || "", hiddenClassIds: currentOverrideHiddenIds(), extraClasses: overrideDraftExtras, roomOverrides: currentOverrideRoomOverrides() });
       closeSheet("overrideSheet");
       renderAll();
       showToast(`${dateLabel(date)}の振替・休講・補講を保存しました`, () => {
@@ -7952,7 +7990,7 @@
     function resetOverrideSheet() {
       const previous = clone(state.dayTimetableOverrides?.[overrideDate] || null);
       const date = overrideDate;
-      saveDayTimetableOverride(date, { weekday: "", hiddenClassIds: [], extraClasses: [] });
+      saveDayTimetableOverride(date, { weekday: "", hiddenClassIds: [], extraClasses: [], roomOverrides: {} });
       closeSheet("overrideSheet");
       renderAll();
       showToast(`${dateLabel(date)}の設定を解除しました`, previous ? () => {
@@ -8009,7 +8047,7 @@
         teacher: $("#makeupEditTeacher").value.trim().slice(0, 80),
         colorKey: $("#makeupEditColor").value || "blue"
       };
-      saveDayTimetableOverride(date, { weekday: found.override.weekday, hiddenClassIds: found.override.hiddenClassIds, extraClasses: found.extraClasses });
+      saveDayTimetableOverride(date, { weekday: found.override.weekday, hiddenClassIds: found.override.hiddenClassIds, extraClasses: found.extraClasses, roomOverrides: found.override.roomOverrides });
       closeSheet("makeupSheet");
       renderAll();
       showToast("補講を保存しました", () => {
@@ -8024,7 +8062,7 @@
       if (!found) return;
       const previous = clone(state.dayTimetableOverrides[date]);
       found.extraClasses.splice(found.index, 1);
-      saveDayTimetableOverride(date, { weekday: found.override.weekday, hiddenClassIds: found.override.hiddenClassIds, extraClasses: found.extraClasses });
+      saveDayTimetableOverride(date, { weekday: found.override.weekday, hiddenClassIds: found.override.hiddenClassIds, extraClasses: found.extraClasses, roomOverrides: found.override.roomOverrides });
       closeSheet("makeupSheet");
       renderAll();
       showToast("補講を削除しました", () => {
@@ -8723,7 +8761,7 @@
       $("#addTodoFromClass").addEventListener("click", addTodoFromClass);
 
       // 振替
-      $("#overrideWeekday").addEventListener("change", () => renderOverrideClassList(currentOverrideHiddenIds()));
+      $("#overrideWeekday").addEventListener("change", () => renderOverrideClassList(currentOverrideHiddenIds(), currentOverrideRoomOverrides()));
       $("#overrideAddMakeupToggle").addEventListener("click", () => {
         const picker = $("#overrideMakeupPicker");
         picker.hidden = !picker.hidden;
