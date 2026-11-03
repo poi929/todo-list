@@ -1115,7 +1115,7 @@
           </div>
           <div class="card" id="githubSyncCard">
             <h2 class="card-title">GitHub同期</h2>
-            <p class="muted small">非公開リポジトリの data.json に保存・復元します。自動同期を有効にすると、最後の変更から3秒後に送信します。Museが読めるのは、GitHubへの保存が完了した内容です。</p>
+            <p class="muted small">非公開リポジトリの data.json に保存・復元します。自動同期を有効にすると、最後の変更から1秒後に送信します。Museが読めるのは、GitHubへの保存が完了した内容です。</p>
             <label class="field"><span class="field-label">保存先リポジトリ（所有者／名前）</span><input id="githubSyncRepo" value="poi929/todoboard-data" placeholder="poi929/todoboard-data" autocomplete="off" autocapitalize="none" spellcheck="false" /></label>
             <label class="field"><span class="field-label">GitHubトークン</span><input id="githubSyncToken" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Fine-grained personal access token" /></label>
             <label class="field" style="display:flex;flex-direction:row;align-items:center;gap:8px"><input id="githubSyncRemember" type="checkbox" style="width:auto" /><span>この端末にトークンを保存する</span></label>
@@ -1546,7 +1546,7 @@
   </div>
 
   <script>
-    const APP_VERSION = "v129";
+    const APP_VERSION = "v130";
     // 保存キーは変更しない。旧版の removeOldStorageKeys() は「todo-calendar-board-v数字」の
     // 自分以外のキーを削除するため、キー名を変えると旧版へ戻した時に新データが消える。
     const STORAGE_KEY = "todo-calendar-board-v96";
@@ -6515,11 +6515,11 @@
       renderGitHubAutoStatus();
     }
 
-    function githubAutoSchedule(delay = 3000) {
+    function githubAutoSchedule(delay = 1000) {
       clearTimeout(githubAutoTimer); githubAutoTimer = null;
       if (!githubAutoReady || !githubAuto.enabled || githubAuto.paused || githubAutoExternal || navigator.onLine === false) return;
-      // 連続操作は最後から3秒、操作が続いても最長60秒で一度送信を試す。
-      if (delay === 3000 && githubAutoFirstChange) delay = Math.min(delay, Math.max(0, githubAutoFirstChange + 60000 - Date.now()));
+      // 連続操作は最後から1秒、操作が続いても最長60秒で一度送信を試す。
+      if (delay === 1000 && githubAutoFirstChange) delay = Math.min(delay, Math.max(0, githubAutoFirstChange + 60000 - Date.now()));
       githubAutoTimer = setTimeout(() => {
         githubAutoTimer = null;
         return githubAutoRun().catch(error => githubAutoHandleError(error));
@@ -6535,7 +6535,7 @@
         if (!githubAuto.enabled) return;
         githubAutoWrite({ ...githubAuto, pending: true });
         if (!githubAutoFirstChange) githubAutoFirstChange = Date.now();
-        if (!githubAuto.paused) githubAutoNotice = "端末に保存済み。最後の変更から3秒後にGitHubへ送信します。";
+        if (!githubAuto.paused) githubAutoNotice = "端末に保存済み。最後の変更から1秒後にGitHubへ送信します。";
         githubAutoSchedule();
         renderGitHubAutoStatus();
       } catch (error) { githubAutoPause("storage", error.message); }
@@ -6678,7 +6678,7 @@
           baseSha: remote.sha, baseHash, pending: githubAutoLocalCanonical() !== local, paused: "", inFlight: null,
           lastSyncedAt: new Date().toISOString(), lastCheckedAt: new Date().toISOString() });
         githubAutoSeen = githubAutoLocalCanonical();
-        githubAutoNotice = enable ? "自動同期を有効にしました。最後の変更から3秒後に送信します。" : "GitHubと内容が一致しています。自動同期はオフのままです。";
+        githubAutoNotice = enable ? "自動同期を有効にしました。最後の変更から1秒後に送信します。" : "GitHubと内容が一致しています。自動同期はオフのままです。";
         setGitHubSyncStatus(githubAutoNotice);
         return true;
       }, { automatic: true });
