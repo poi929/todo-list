@@ -1546,7 +1546,7 @@
   </div>
 
   <script>
-    const APP_VERSION = "v130";
+    const APP_VERSION = "v131";
     // 保存キーは変更しない。旧版の removeOldStorageKeys() は「todo-calendar-board-v数字」の
     // 自分以外のキーを削除するため、キー名を変えると旧版へ戻した時に新データが消える。
     const STORAGE_KEY = "todo-calendar-board-v96";
@@ -8609,6 +8609,22 @@
       }));
       $("#calPrev").addEventListener("click", () => shiftCalendar(-1));
       $("#calNext").addEventListener("click", () => shiftCalendar(1));
+      // 週表示では、左右のフリックでも前後の週へ移動できるようにする
+      {
+        let swipeStart = null;
+        const body = $("#calendarBody");
+        body.addEventListener("touchstart", event => {
+          swipeStart = event.touches.length === 1 ? { x: event.touches[0].clientX, y: event.touches[0].clientY } : null;
+        }, { passive: true });
+        body.addEventListener("touchend", event => {
+          if (!swipeStart || state.calendarMode !== "week") { swipeStart = null; return; }
+          const touch = event.changedTouches[0];
+          const dx = touch.clientX - swipeStart.x;
+          const dy = touch.clientY - swipeStart.y;
+          swipeStart = null;
+          if (Math.abs(dx) >= 48 && Math.abs(dx) > Math.abs(dy) * 1.5) shiftCalendar(dx < 0 ? 1 : -1);
+        }, { passive: true });
+      }
       $("#calToday").addEventListener("click", goCalendarToday);
       $("#calDateInput").addEventListener("change", event => {
         const value = event.target.value;
