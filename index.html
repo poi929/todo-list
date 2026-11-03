@@ -1546,7 +1546,7 @@
   </div>
 
   <script>
-    const APP_VERSION = "v128";
+    const APP_VERSION = "v129";
     // 保存キーは変更しない。旧版の removeOldStorageKeys() は「todo-calendar-board-v数字」の
     // 自分以外のキーを削除するため、キー名を変えると旧版へ戻した時に新データが消える。
     const STORAGE_KEY = "todo-calendar-board-v96";
@@ -7179,8 +7179,8 @@
         const repeatingTodo = $("#itemRepeatMode").value !== "none";
         $("#itemSeriesNote").hidden = !repeatingTodo;
         $("#itemSeriesNote").textContent = $("#itemRepeatMode").value === "weekly"
-          ? "曜日ごとに独立したTodoです。完了した曜日の分だけ翌週へ進みます。完了した回は完了済みに残ります。"
-          : "完了にすると、締切日が次の回へ進みます。完了した回は完了済みに残ります。";
+          ? "曜日ごとに独立したTodoです。完了した曜日の分だけ翌週へ進みます。保存するときに「この回だけ」か「すべての回」かを選べます。"
+          : "完了にすると、締切日が次の回へ進みます。保存するときに「この回だけ」か「すべての回」かを選べます。";
         return;
       }
       const repeating = itemSheet.mode === "edit" && itemSheet.kind === "event" && $("#itemRepeatMode").value !== "none";
@@ -7408,6 +7408,41 @@
         fields.endDate = dateOffset(fields.date, duration);
         if (fields.repeatUntil && fields.repeatUntil < fields.date) fields.repeatUntil = "";
         if (shift && Array.isArray(existing.exceptionDates)) fields.exceptionDates = existing.exceptionDates.map(date => dateOffset(date, shift));
+      }
+
+      // 繰り返しTodoの特定の回を編集した場合（予定と同じく「この回だけ」を選べる）
+      if (existing && existing.kind === "todo" && !existing.done && todoRepeatMode(existing) !== "none" && repeatMode !== "none") {
+        const answer = await confirmDialog({
+          title: "繰り返しのTodoを変更",
+          message: `${longDateLabel(existing.date)}の回だけを変えますか？それとも、すべての回を変えますか？`,
+          buttons: [{ label: "キャンセル", value: null }, { label: "この回だけ", value: "one" }, { label: "すべての回", value: "all", style: "primary" }]
+        });
+        if (!answer) return;
+        if (answer === "one") {
+          const occurrenceDate = existing.date;
+          const single = { id: makeId("todo"), ...fields, kind: "todo", repeatMode: "none", repeatUntil: "", done: false };
+          delete single.repeatWeekdays;
+          delete single.repeatAnchor;
+          stampCreated(single);
+          const next = nextTodoDueDate(existing);
+          state.todos.push(single);
+          if (next) {
+            existing.date = next;
+            stampUpdated(existing);
+          } else {
+            state.todos = state.todos.filter(item => item !== existing);
+          }
+          closeSheet("itemSheet");
+          renderAll();
+          showToast(`${dateLabel(occurrenceDate)}の回だけ変更しました`, () => {
+            state.todos = state.todos.filter(item => item !== single);
+            if (next) existing.date = occurrenceDate;
+            else state.todos.push(existing);
+            renderAll();
+          });
+          return;
+        }
+        // 「すべての回」は通常の編集処理へ進む
       }
 
       if (itemSheet.mode === "add") {
